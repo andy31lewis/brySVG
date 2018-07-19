@@ -14,6 +14,10 @@ import browser.svg as svg
 from browser import alert
 svgbase = svg.svg()
 
+def delete(element):
+    element.parentNode.removeChild(element)
+    del element
+
 class SVGMixin(object):
     def cloneObject(self):
         newobject = self.__class__()
@@ -21,47 +25,133 @@ class SVGMixin(object):
             newobject.ObjectList = []
             for obj in self.ObjectList:
                 newobj = obj.cloneObject()
-                newobject <= newobj
-                newobject.ObjectList.append(newobj)
+                newobject.AddObject(newobj)
+        elif isinstance(self, PointObject):
+            newobject.XY = self.XY
+        elif isinstance(self, (BezierObject, ClosedBezierObject)):
+            newobject.PointsetList = self.PointsetList
+        else:
+            newobject.PointList = self.PointList
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         return newobject
 
-    def translate(self, vector):
-        t = svgbase.createSVGTransform()
-        t.setTranslate(*vector)
-        self.transform.baseVal.insertItemBefore(t, 0)
-        return t.matrix
+    def transformedPoint(self, matrix):
+        pt = svgbase.createSVGPoint()
+        (pt.x, pt.y) = self.XY
+        pt =  pt.matrixTransform(matrix)
+        return Point((pt.x, pt.y))
         
-    def rotate(self, angle, centre=(0,0)):
-        t = svgbase.createSVGTransform()
-        t.setRotate(angle, *centre)
-        self.transform.baseVal.insertItemBefore(t, 0)
-        return t.matrix
+    def transformedPointList(self, matrix):
+        pt = svgbase.createSVGPoint()
+        newpointlist = []
+        for point in self.PointList:
+            (pt.x, pt.y) = point
+            pt =  pt.matrixTransform(matrix)
+            newpointlist.append(Point((pt.x, pt.y)))
+        return newpointlist
+        
+    def transformedPointsetList(self, matrix):
+        pt = svgbase.createSVGPoint()
+        newpointsetlist = []
+        for pointset in self.PointsetList:
+            newpointset = []
+            for point in pointset:
+                (pt.x, pt.y) = point
+                pt = pt.matrixTransform(matrix)
+                newpointset.append(Point((pt.x, pt.y)))
+            newpointsetlist.append(newpointset)
+        return newpointsetlist
+
+    def transformPoints(self, matrix):
+        if isinstance(self, PointObject):
+            self.XY = self.transformedPoint(matrix)
+        elif isinstance(self, (BezierObject, ClosedBezierObject)):
+            self.PointsetList = self.transformedPointsetList(matrix)
+        else:
+            self.PointList = self.transformedPointList(matrix)
+            
+    def translate2(self, vector):
+        if isinstance(self, GroupObject):
+            for obj in self.ObjectList:
+                obj.translate(vector)
+        else:
+            t = svgbase.createSVGTransform()
+            t.setTranslate(*vector)
+            self.transformPoints(t.matrix)
+            self.Update()
+    
+    def rotate(self, angle, centre=None):
+        if not centre: 
+            bbox = self.getBBox()
+            centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
+        if isinstance(self, GroupObject):
+            for obj in self.ObjectList:
+                obj.rotate(angle, centre)
+        else:
+            t = svgbase.createSVGTransform()
+            t.setRotate(angle, *centre)
+            self.transformPoints(t.matrix)
+            if isinstance(self, (EllipseObject, RectangleObject)):
+                self.transform.baseVal.insertItemBefore(t, 0)
+                self.matrix = self.transform.baseVal.consolidate().matrix
+            else:
+                self.Update()
 
     def scale(self, xscale, yscale):
-        t = svgbase.createSVGTransform()
-        t.setScale(xscale, yscale)
-        self.transform.baseVal.insertItemBefore(t, 0)
-        return t.matrix
+        if isinstance(self, GroupObject):
+            for obj in self.ObjectList:
+                obj.scale(xscale, yscale)
+        else:
+            t = svgbase.createSVGTransform()
+            t.setScale(xscale, yscale)
+            self.transformPoints(t.matrix)
+            self.Update()
 
-class LineObject(svg.line):
-    def __init__(self, point1, point2, style="solid"):
-        (x1, y1) = point1
-        (x2, y2) = point2
+    def matrixtransform(self, matrix):
+        if isinstance(self, GroupObject):
+            for obj in self.ObjectList:
+                obj.matrixtransform(matrix)
+        else:
+            self.transformPoints(matrix)
+            if isinstance(self, (EllipseObject, RectangleObject)):
+                print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
+                self.matrix = matrix.multiply(self.matrix)
+                print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
+                t = svgbase.createSVGTransform()
+                t.setMatrix(self.matrix)
+                self.transform.baseVal.initialize(t)
+            else:
+                self.Update()
+
+class LineObject(svg.line, SVGMixin):
+    def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None):
+        [(x1, y1), (x2, y2)] = pointlist
                 
         if style == "faintdash1":
             dasharray = "10,5"
-            colour = "grey"
+            linecolour = "grey"
         elif style == "faintdash2":
             dasharray = "2,2"
-            colour = "lightgrey"
+            linecolour = "lightgrey"
         else:
             dasharray = None
-            colour = "black"
 
-        svg.line.__init__(self, x1=x1, y1=y1, x2=x2, y2=y2, stroke=colour, stroke_dasharray=dasharray, stroke_width="1")
+        svg.line.__init__(self, x1=x1, y1=y1, x2=x2, y2=y2, style={"stroke":linecolour, "strokeDasharray":dasharray, "strokeWidth":linewidth})
+        self.PointList = [Point(coords) for coords in pointlist]
 
+    def Update(self):
+        [(x1, y1), (x2, y2)] = self.PointList
+        self.attrs["x1"] = x1
+        self.attrs["y1"] = y1
+        self.attrs["x2"] = x2
+        self.attrs["y2"] = y2
+        
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+        
 class TextObject(svg.text):
     def __init__(self, string, point, anchorpos=1, style="normal"):
         (x, y) = point
@@ -80,104 +170,184 @@ class TextObject(svg.text):
 
         svg.text.__init__(self, string, x=x, y=y, font_size=12, dy=yoffset, text_anchor=horizpos)
 
-class PolylineObject(svg.polyline):
-    def __init__(self, pointlist, linecolour="black", linewidth=1, fillcolour=None):
+class PolylineObject(svg.polyline, SVGMixin):
+    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour=None):
         plist = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
         svg.polyline.__init__(self, points=plist, fill="none", style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
-        self.PointList = pointlist[:]
+        self.PointList = [Point(coords) for coords in pointlist]
 
+    def Update(self):
+        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+        
     def SetPoints(self, pointlist):
         self.PointList = [Point(coords) for coords in pointlist]
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
+        self.Update()
 
     def SetPoint(self, i, point):
         self.PointList[i] = point
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
 
     def AppendPoint(self, point):
         self.PointList.append(point)
-        print (self.PointList)
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
 
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
 
 class PolygonObject(svg.polygon, SVGMixin):
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         plist = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
         svg.polygon.__init__(self, points=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
-        self.PointList = pointlist[:]
+        self.PointList = [Point(coords) for coords in pointlist]
 
+    def Update(self):
+        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+        
     def SetPoints(self, pointlist):
         self.PointList = [Point(coords) for coords in pointlist]
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
+        self.Update()
 
     def SetPoint(self, i, point):
         self.PointList[i] = point
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
 
     def AppendPoint(self, point):
         self.PointList.append(point)
-        #print (self.PointList)
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
     
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
+        self.Update()
         
+class RectangleObject(svg.rect, SVGMixin):
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
+        [(x1, y1), (x2, y2)] = pointlist
+        svg.rect.__init__(self, x=x1, y=y1, width=abs(x2-x1), height=abs(y2-y1), style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        self.PointList = [Point(coords) for coords in pointlist]
+        self.matrix = None
 
-class RectangleObject(svg.rect):
-    def __init__(self, point1, point2, linecolour="black", linewidth=1, fillcolour="yellow"):
-        (x1, y1) = point1
-        (x2, y2) = point2
-        svg.rect.__init__(self, x=x1, y=y1, width=x2-x1, height=y2-y1, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
-
+    def Update(self):
+        basepointlist = self.transformedPointList(self.matrix.inverse()) if self.matrix else self.PointList
+        [(x1, y1), (x2, y2)] = basepointlist
+        self.attrs["x"] = x1
+        self.attrs["y"] = y1
+        self.attrs["width"] = abs(x2-x1)
+        self.attrs["height"] = abs(y2-y1)
+        
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+        
 class EllipseObject(svg.ellipse, SVGMixin):
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         [(x1, y1), (x2, y2)] = pointlist
         svg.ellipse.__init__(self, cx=(x1+x2)/2, cy=(y1+y2)/2, rx=abs(x2-x1)/2, ry=abs(y2-y1)/2, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
-        self.PointList=pointlist[:]
-    
-    def SetPoints(self, pointlist):
         self.PointList = [Point(coords) for coords in pointlist]
-        (x1, y1) = self.PointList[0]; (x2, y2) = self.PointList[1]
+        self.matrix = None
+        #self.bind("mousedown", self.onLeftDown)
+    
+    def Update(self):
+        basepointlist = self.transformedPointList(self.matrix.inverse()) if self.matrix else self.PointList
+        [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["cx"]=(x1+x2)/2
         self.attrs["cy"]=(y1+y2)/2
         self.attrs["rx"]=abs(x2-x1)/2
         self.attrs["ry"]=abs(y2-y1)/2
+
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+
+    def SetPoints(self, pointlist):
+        self.PointList = [Point(coords) for coords in pointlist]
+        self.Update()
 
     def SetPoint(self, i, point):
         self.PointList[i] = point
-        (x1, y1) = self.PointList[0]; (x2, y2) = self.PointList[1]
-        self.attrs["cx"]=(x1+x2)/2
-        self.attrs["cy"]=(y1+y2)/2
-        self.attrs["rx"]=abs(x2-x1)/2
-        self.attrs["ry"]=abs(y2-y1)/2
-
-class CircleObject(svg.circle):
-    def __init__(self, centre, radius, linecolour="black", linewidth=1, fillcolour="yellow"):
+        self.Update()
+    """
+    def onLeftDown(self, event):
+        self.Canvas.MouseOwner = self
+        self.Canvas.StartPoint = self.Canvas.getSVGcoords(event)
+    """
+class CircleObject(svg.circle, SVGMixin):
+    def __init__(self, centre=(0,0), radius=0, linecolour="black", linewidth=1, fillcolour="yellow"):
         (x, y) = centre
         svg.circle.__init__(self, cx=x, cy=y, r=radius, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        self.PointList = [(x, y), (x+radius, y)]
+        self.Group = None
 
-class BezierObject(svg.path):
-    def __init__(self, fullpointlist, linecolour="black", linewidth=1, fillcolour=None):
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        plist = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
+    def Update(self):
+        [(x1, y1), (x2, y2)] = self.PointList
+        self.attrs["cx"]=x1
+        self.attrs["cy"]=y1
+        self.attrs["r"]=((x2-x1)**2 + (y2-y1)**2)**0.5
+
+    def translate(self, vector):
+        for i in range(len(self.PointList)):
+            self.PointList[i] += vector
+        self.Update()
+
+    def SetPoints(self, pointlist):
+        self.PointList = [Point(coords) for coords in pointlist]
+        self.Update()
+
+    def SetPoint(self, i, point):
+        self.PointList[i] = point
+        self.Update()
+
+class BezierObject(svg.path, SVGMixin):
+    def __init__(self, pointsetlist=[((0,0), (0,0))], linecolour="black", linewidth=1, fillcolour=None):
+        ((x, y), (cx, cy)) = pointsetlist[0]
+        plist = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in pointsetlist[1:] for c in p for x in c)
         svg.path.__init__(self, d=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        self.PointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
+
+    def Update(self):
+        ((x, y), (cx, cy)) = self.PointsetList[0]
+        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in self.PointsetList[1:] for c in p for x in c)
+
+    def translate(self, vector):
+        for i in range(len(self.PointsetList)):
+            for j in range(len(self.PointsetList[i])):
+                self.PointsetList[i][j] += vector
+        self.Update()
         
-class ClosedBezierObject(svg.path):
-    def __init__(self, fullpointlist, linecolour="black", linewidth=1, fillcolour="yellow"):
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        plist = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
+class ClosedBezierObject(svg.path, SVGMixin):
+    def __init__(self, pointsetlist=[((0,0), (0,0), (0,0))], linecolour="black", linewidth=1, fillcolour="yellow"):
+        ((c1x, c1y), (x, y), (c2x, c2y)) = pointsetlist[0]
+        plist = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in pointsetlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
         svg.path.__init__(self, d=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
-        
+        self.PointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
+
+    def Update(self):
+        ((c1x, c1y), (x, y), (c2x, c2y)) = self.PointsetList[0]
+        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in self.PointsetList[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
+
+    def translate(self, vector):
+        for i in range(len(self.PointsetList)):
+            for j in range(len(self.PointsetList[i])):
+                self.PointsetList[i][j] += vector
+        self.Update()
+
 class SmoothBezierObject(BezierObject):
-    def __init__(self, pointlist, linecolour="black", linewidth=1, fillcolour=None):
-        fullpointlist = self.getfullpointlist(pointlist)
-        BezierObject.__init__(self, fullpointlist, linecolour, linewidth, fillcolour)
-        self.PointList = pointlist[:]
-        self.FullPointList = fullpointlist
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
+        pointsetlist = self.getpointsetlist(pointlist)
+        BezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
+        self.PointList = [Point(coords) for coords in pointlist]
             
     def calculatecontrolpoints(self, points):
         [(x1, y1), (x2, y2), (x3, y3)] = points
@@ -195,68 +365,57 @@ class SmoothBezierObject(BezierObject):
         c2 = ((c2x+x2)/2, (c2y+y2)/2)        
         return (c1, c2)
         
-    def getfullpointlist(self, pointlist):
+    def getpointsetlist(self, pointlist):
         if len(pointlist) == 2: return[pointlist, pointlist]
         for i in range(1, len(pointlist)-1):
             (c1, c2) = self.calculatecontrolpoints(pointlist[i-1:i+2])
             if i == 1:
                 (x1, y1) = pointlist[0]
                 (x2, y2) = c1
-                fullpointlist = [(pointlist[0], ((x1+x2)/2, (y1+y2)/2))]
-            fullpointlist.append((c1, pointlist[i], c2))
+                pointsetlist = [(pointlist[0], ((x1+x2)/2, (y1+y2)/2))]
+            pointsetlist.append((c1, pointlist[i], c2))
         (x1, y1) = pointlist[-1]
         (x2, y2) = c2
-        fullpointlist.append((((x1+x2)/2, (y1+y2)/2), pointlist[-1]))
-        #print (fullpointlist)
-        return fullpointlist
+        pointsetlist.append((((x1+x2)/2, (y1+y2)/2), pointlist[-1]))
+        #print (pointsetlist)
+        return pointsetlist
 
     def SetPointset(self, i, pointset):
         self.PointList[i] = pointset[0] if i==0 else pointset[1]
-        self.FullPointList[i] = pointset
-        ((x, y), (cx, cy)) = self.FullPointList[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in self.FullPointList[1:] for c in p for x in c)
+        self.PointsetList[i] = pointset
+        self.Update()
 
     def SetPoint(self, i, point):
         self.PointList[i] = point
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
     def SetPoints(self, pointlist):
         self.PointList = [Point(coords) for coords in pointlist]
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
-    def SetFullPoints(self, fullpointlist):
-        self.PointList = [pset[1] for pset in fullpointlist]
-        self.PointList[0] = fullpointlist[0][0]
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
-        self.FullPointList = fullpointlist        
+    def SetFullPoints(self, pointsetlist):
+        self.PointList = [pset[1] for pset in pointsetlist]
+        self.PointList[0] = pointsetlist[0][0]
+        self.PointsetList = pointsetlist        
+        self.Update()
 
     def AppendPoint(self, point):
         self.PointList.append(point)
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
-        self.FullPointList = fullpointlist
-    
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
+   
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((x, y), (cx, cy)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
 class SmoothClosedBezierObject(ClosedBezierObject):
-    def __init__(self, pointlist, linecolour="black", linewidth=1, fillcolour="yellow"):
-        fullpointlist = self.getfullpointlist(pointlist)
-        ClosedBezierObject.__init__(self, fullpointlist, linecolour, linewidth, fillcolour)
-        self.PointList = pointlist[:]
-        self.FullPointList = fullpointlist
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
+        pointsetlist = self.getpointsetlist(pointlist)
+        ClosedBezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
+        self.PointList = [Point(coords) for coords in pointlist]
             
     def calculatecontrolpoints(self, points):
         [(x1, y1), (x2, y2), (x3, y3)] = points
@@ -274,63 +433,59 @@ class SmoothClosedBezierObject(ClosedBezierObject):
         c2 = ((c2x+x2)/2, (c2y+y2)/2)        
         return (c1, c2)
         
-    def getfullpointlist(self, pointlist):
+    def getpointsetlist(self, pointlist):
         pointlist = [pointlist[-1]]+pointlist[:]+[pointlist[0]]
         #print (pointlist)
         #if len(pointlist) == 2: return[pointlist, pointlist]
-        fullpointlist = []
+        pointsetlist = []
         for i in range(1, len(pointlist)-1):
             (c1, c2) = self.calculatecontrolpoints(pointlist[i-1:i+2])
-            fullpointlist.append((c1, pointlist[i], c2))
-        #print (fullpointlist)
-        return fullpointlist
+            pointsetlist.append((c1, pointlist[i], c2))
+        #print (pointsetlist)
+        return pointsetlist
 
     def SetPointset(self, i, pointset):
         self.PointList[i] = pointset[1]
-        self.FullPointList[i] = pointset
-        ((c1x, c1y), (x, y), (c2x, c2y)) = self.FullPointList[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in self.FullPointList[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
+        self.PointsetList[i] = pointset
+        self.Update()
 
     def SetPoint(self, i, point):
         self.PointList[i] = point
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
     def SetPoints(self, pointlist):
         self.PointList = [Point(coords) for coords in pointlist]
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
-    def SetFullPoints(self, fullpointlist):
-        self.PointList = [pset[1] for pset in fullpointlist]
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        self.FullPointList = fullpointlist        
+    def SetFullPoints(self, pointsetlist):
+        self.PointList = [pset[1] for pset in pointsetlist]
+        self.PointsetList = pointsetlist        
+        self.Update()
 
     def AppendPoint(self, point):
         self.PointList.append(point)
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
     
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
-        fullpointlist = self.getfullpointlist(self.PointList)
-        ((c1x, c1y), (x, y), (c2x, c2y)) = fullpointlist[0]
-        self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in fullpointlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        self.FullPointList = fullpointlist
+        self.PointsetList = self.getpointsetlist(self.PointList)
+        self.Update()
 
-class PointObject(svg.circle):
-    def __init__(self, XY, colour="black", pointsize=2):
+class PointObject(svg.circle, SVGMixin):
+    def __init__(self, XY=(0,0), colour="black", pointsize=2):
         (x, y) = XY
         svg.circle.__init__(self, cx=x, cy=y, r=pointsize, style={"stroke":colour, "strokeWidth":1, "fill":colour})
         self._XY = None
         self.XY = Point(XY)
+
+    def Update(self):
+        pass
+
+    def translate(self, vector):
+        self.XY = self.XY+vector
 
     @property
     def XY(self):
@@ -346,12 +501,16 @@ class GroupObject(svg.g, SVGMixin):
     def __init__(self, objlist=[], id=None):
         svg.g.__init__(self)
         if id: self.attrs["id"] = id
+        if not isinstance(objlist, list): objlist = [objlist]
+        self.ObjectList = []
         for obj in objlist:
-            self <= obj
-        self.ObjectList = objlist
+            self.AddObject(obj)
+        self._Canvas = None
+        self.Group = None
 
     def AddObject(self, svgobject):
         self <= svgobject
+        svgobject.Group = self
         self.ObjectList.append(svgobject)
 
     def ClearAll(self):
@@ -359,27 +518,173 @@ class GroupObject(svg.g, SVGMixin):
             self.removeChild(self.firstChild)
         self.ObjectList = []
 
+    def translate(self, vector):
+        for obj in self.ObjectList:
+            obj.translate(vector)
+
+    @property
+    def Canvas(self):
+        return self._Canvas
+
+    @Canvas.setter
+    def Canvas(self, canvas):
+        self._Canvas = canvas
+        for obj in self.ObjectList:
+            obj.Canvas = canvas
+
 class CanvasObject(svg.svg):
     def __init__(self, width, height, colour="white"):
-        svg.svg.__init__(self, width=width, height=height, style={"backgroundColor":colour})
+        svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
+        self.MouseOwner = None
+        self.MouseAction = 0
+        self.ObjectDict = {}
+        self.Cursors = ["auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
+        self.TransformOrigin = None
+        self.bind("mousedown", self.onLeftDown)
+        self.bind("mousemove", self.onMouseMove)
+        self.bind("mouseup", self.onLeftUp)
+        self.bind("dragstart", self.onDragStart)
+        self.bind("contextmenu", self.onRightClick)
+
+    def setDimensions(self):
+        bbox = self.getBoundingClientRect()
+        self.attrs["width"] = bbox.width
+        self.attrs["height"] = bbox.height
+
+    def fitContents(self):
+        bbox = self.getBBox()
+        bboxstring = str(bbox.x*1.01)+" "+str(bbox.y*1.01)+" "+str(bbox.width*1.01)+" "+str(bbox.height*1.01)
+        self.attrs["viewBox"] = bboxstring
+        #self.attrs["preserveAspectRatio"] = "none"
+
+    def getSVGcoords(self, event):
+        pt = self.createSVGPoint()
+        (pt.x, pt.y) = (event.clientX, event.clientY)
+        SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
+        return Point((SVGpt.x, SVGpt.y))
+
+    def setMouseAction(self, n):
+        self.MouseAction = n
+        self.style.cursor = self.Cursors[n]
     
-    def AddObject(self, SVGObject):
-        self <= SVGObject
-        return SVGObject
+    def onRightClick(self, event):
+        event.preventDefault()
+        self.setMouseAction((self.MouseAction+1)%6)
+
+    def onDragStart(self, event):
+        event.preventDefault()        
+    
+    def onMouseMove(self, event):
+        if not self.MouseOwner or self.MouseAction == 0: return
+        currentcoords = self.getSVGcoords(event)
+        offset = currentcoords - self.StartPoint
+        (cx, cy) = self.MouseOwnerCentre
+        (x1, y1) = currentcoords - self.MouseOwnerCentre
+        (x2, y2) = self.StartPoint - self.MouseOwnerCentre
+        self.StartPoint = currentcoords
+        if self.MouseAction == 1:
+            self.MouseOwner.translate(offset)
+        elif self.MouseAction == 2:
+            matrix = self.createSVGMatrix()
+            matrix = matrix.translate(cx, cy)
+            matrix = matrix.rotateFromVector(x1*x2+y1*y2, x2*y1-x1*y2)
+            matrix = matrix.translate(-cx, -cy)
+            self.MouseOwner.matrixtransform(matrix)
+        elif self.MouseAction == 3:
+            matrix = self.createSVGMatrix()
+            matrix = matrix.translate(cx, cy)
+            matrix.a = x1/x2
+            matrix = matrix.translate(-cx, -cy)
+            self.MouseOwner.matrixtransform(matrix)
+        elif self.MouseAction == 4:
+            matrix = self.createSVGMatrix()
+            matrix = matrix.translate(cx, cy)
+            matrix.d = y1/y2
+            matrix = matrix.translate(-cx, -cy)
+            self.MouseOwner.matrixtransform(matrix)
+        elif self.MouseAction == 5:
+            matrix = self.createSVGMatrix()
+            matrix = matrix.translate(cx, cy)
+            matrix = matrix.scale((x1**2+y1**2)**0.5/(x2**2+y2**2)**0.5)
+            matrix = matrix.translate(-cx, -cy)
+            print (matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f)
+            self.MouseOwner.matrixtransform(matrix)
+
+    def onLeftDown(self, event):
+        if self.MouseAction == 0 or event.button > 0 or event.target.id == "": return
+        svgobj = self.ObjectDict[event.target.id]
+        while getattr(svgobj, "Group", None):
+            svgobj = svgobj.Group 
+        self.MouseOwner = svgobj
+        bbox = self.MouseOwner.getBBox()
+        (cx, cy) = self.MouseOwnerCentre = Point((bbox.x+bbox.width/2, bbox.y+bbox.height/2))
+        self.StartPoint = self.getSVGcoords(event)
+        if self.MouseAction == 1: return
+        if self.MouseAction in [2, 5]:
+            self.TransformOrigin = PointObject(self.MouseOwnerCentre, colour="blue", pointsize=5)
+        elif self.MouseAction == 3:
+            self.TransformOrigin = LineObject([(cx, bbox.y), (cx, bbox.y+bbox.height)], linecolour="blue", linewidth=2)
+        elif self.MouseAction == 4:
+            self.TransformOrigin = LineObject([(bbox.x, cy), (bbox.x+bbox.width, cy)], linecolour="blue", linewidth=2)
+        self <= self.TransformOrigin
+            
+    def onLeftUp(self, event):
+        self.MouseOwner = None
+        if self.TransformOrigin:
+            delete(self.TransformOrigin)
+            self.TransformOrigin = None
+
+    def AddObject(self, svgobject):
+        def AddToDict(svgobj):
+            if not svgobj.id: svgobj.id = "id"+str(len(self.ObjectDict))
+            self.ObjectDict[svgobj.id] = svgobj
+            if isinstance(svgobj, GroupObject):
+                for obj in svgobj.ObjectList:
+                    AddToDict(obj)
+        self <= svgobject
+        AddToDict(svgobject)
+        svgobject.Canvas = self
+        return svgobject
     
     def ClearAll(self):
         while self.firstChild:
             self.removeChild(self.firstChild)
 
+    def rotate(self, element, angle, centre=None):
+        if not centre: 
+            bbox = element.getBBox()
+            centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
+        t = svgbase.createSVGTransform()
+        t.setRotate(angle, *centre)
+        element.transform.baseVal.insertItemBefore(t, 0)
+        return t.matrix
+
+    def translate(self, element, vector):
+        t = svgbase.createSVGTransform()
+        t.setTranslate(*vector)
+        element.transform.baseVal.insertItemBefore(t, 0)
+        return t.matrix
+        
 class Point(object):
     def __init__(self, coords):
-        self.coords = coords.coords if isinstance(coords, Point) else coords
+        self.coords = coords.coords if isinstance(coords, Point) else list(coords)
 
     def __str__(self):
         return str(tuple(self.coords))
 
     def __add__(self, other):
-        return Point([xi+yi for (xi, yi) in zip(self.coords, other.coords)])
+        if isinstance(other, (list, tuple)):
+            return Point([xi+yi for (xi, yi) in zip(self.coords, other)])
+        else:
+            return Point([xi+yi for (xi, yi) in zip(self.coords, other.coords)])
+
+    def __iadd__(self, other):
+        if isinstance(other, (list, tuple)):
+            for i in range(len(self.coords)):
+                self.coords[i] += other[i]
+        else:
+            for i in range(len(self.coords)):
+                self.coords[i] += other.coords[i]
 
     def __sub__(self, other):
         return Point([xi-yi for (xi, yi) in zip(self.coords, other.coords)])
