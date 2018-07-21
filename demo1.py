@@ -26,5 +26,5 @@ for i in range(10):
         tile.translate((i*100, j*100))
         #canvas.rotate(tile, 90*(i*6+j))
         #canvas.translate(tile, (i*100, j*100))
-    canvas.fitContents()
+canvas.fitContents()
 print (time()-t)

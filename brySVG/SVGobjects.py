@@ -315,10 +315,14 @@ class BezierObject(svg.path, SVGMixin):
         plist = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in pointsetlist[1:] for c in p for x in c)
         svg.path.__init__(self, d=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
+        self.PointList = [pointset[1] for pointset in self.PointsetList]
+        self.PointList[0] = self.PointsetList[0][0]
 
     def Update(self):
         ((x, y), (cx, cy)) = self.PointsetList[0]
         self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(cx)+" "+str(cy)+" "+" ".join(str(x) for p in self.PointsetList[1:] for c in p for x in c)
+        self.PointList = [pointset[1] for pointset in self.PointsetList]
+        self.PointList[0] = self.PointsetList[0][0]
 
     def translate(self, vector):
         for i in range(len(self.PointsetList)):
@@ -332,10 +336,12 @@ class ClosedBezierObject(svg.path, SVGMixin):
         plist = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in pointsetlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
         svg.path.__init__(self, d=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
+        self.PointList = [pointset[1] for pointset in self.PointsetList]
 
     def Update(self):
         ((c1x, c1y), (x, y), (c2x, c2y)) = self.PointsetList[0]
         self.attrs["d"] = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in self.PointsetList[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
+        self.PointList = [pointset[1] for pointset in self.PointsetList]
 
     def translate(self, vector):
         for i in range(len(self.PointsetList)):
@@ -347,7 +353,7 @@ class SmoothBezierObject(BezierObject):
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
         pointsetlist = self.getpointsetlist(pointlist)
         BezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
-        self.PointList = [Point(coords) for coords in pointlist]
+        #self.PointList = [Point(coords) for coords in pointlist]
             
     def calculatecontrolpoints(self, points):
         [(x1, y1), (x2, y2), (x3, y3)] = points
@@ -391,13 +397,13 @@ class SmoothBezierObject(BezierObject):
         self.Update()
 
     def SetPoints(self, pointlist):
-        self.PointList = [Point(coords) for coords in pointlist]
-        self.PointsetList = self.getpointsetlist(self.PointList)
+        #self.PointList = [Point(coords) for coords in pointlist]
+        self.PointsetList = self.getpointsetlist(pointlist)
         self.Update()
 
     def SetFullPoints(self, pointsetlist):
-        self.PointList = [pset[1] for pset in pointsetlist]
-        self.PointList[0] = pointsetlist[0][0]
+        #self.PointList = [pset[1] for pset in pointsetlist]
+        #self.PointList[0] = pointsetlist[0][0]
         self.PointsetList = pointsetlist        
         self.Update()
 
@@ -540,11 +546,12 @@ class CanvasObject(svg.svg):
         self.ObjectDict = {}
         self.Cursors = ["auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
         self.TransformOrigin = None
+        self.Snap = None
+        self.RotateSnap = None
         self.bind("mousedown", self.onLeftDown)
         self.bind("mousemove", self.onMouseMove)
         self.bind("mouseup", self.onLeftUp)
         self.bind("dragstart", self.onDragStart)
-        self.bind("contextmenu", self.onRightClick)
 
     def setDimensions(self):
         bbox = self.getBoundingClientRect()
@@ -611,8 +618,10 @@ class CanvasObject(svg.svg):
             self.MouseOwner.matrixtransform(matrix)
 
     def onLeftDown(self, event):
+        print (self.MouseAction, event.button, event.target, event.target.id)
         if self.MouseAction == 0 or event.button > 0 or event.target.id == "": return
         svgobj = self.ObjectDict[event.target.id]
+        self <= svgobj
         while getattr(svgobj, "Group", None):
             svgobj = svgobj.Group 
         self.MouseOwner = svgobj
@@ -629,10 +638,51 @@ class CanvasObject(svg.svg):
         self <= self.TransformOrigin
             
     def onLeftUp(self, event):
-        self.MouseOwner = None
+        print (self.MouseAction, event.button, event.target, event.target.id)
+        if self.MouseAction == 0 or event.button > 0: return
         if self.TransformOrigin:
             delete(self.TransformOrigin)
             self.TransformOrigin = None
+        if self.Snap and getattr(self.MouseOwner, "PointList", None):
+            for objid in self.ObjectDict:
+                if objid == self.MouseOwner.id: continue
+                if not getattr(self.ObjectDict[objid], "PointList", None): continue
+                for point1 in self.ObjectDict[objid].PointList:
+                    for point2 in self.MouseOwner.PointList:
+                        (dx, dy) = point1 - point2
+                        if abs(dx) < self.Snap and abs(dy) < self.Snap:
+                            if self.RotateSnap:
+                                pl1 = self.ObjectDict[objid].PointList
+                                L = len(pl1)
+                                i = pl1.index(point1)
+                                vec1a = pl1[(i+1)%L] - point1
+                                vec1b = pl1[(i-1)%L] - point1
+                                grads1 = [vec1a.grad(), vec1b.grad()]
+                                pl2 = self.MouseOwner.PointList
+                                L = len(pl2)
+                                j = pl2.index(point2)
+                                vec2a = pl2[(j+1)%L] - point2
+                                vec2b = pl2[(j-1)%L] - point2
+                                grads2 = [vec2a.grad(), vec2b.grad()]
+                                print (grads1, grads2)
+                                for g1 in grads1:
+                                    for g2 in grads2:
+                                        diff = 1000 if g1*g2 == -1 else (g1-g2)/(1+g1*g2)
+                                        if abs(diff) < self.RotateSnap:
+                                            print (pl1[i], pl2[j], g1, g2, diff)
+                                            matrix = self.createSVGMatrix()
+                                            matrix = matrix.rotateFromVector(1, diff)
+                                            self.MouseOwner.matrixtransform(matrix)
+                                            print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
+                                            (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
+                                            print (dx, dy)
+                                            
+                                
+                            self.MouseOwner.translate((dx, dy))
+                            self.MouseOwner = None
+                            return
+        self.MouseOwner = None
+                
 
     def AddObject(self, svgobject):
         def AddToDict(svgobj):
@@ -722,6 +772,9 @@ class Point(object):
 
     def length(self):
         return (sum(xi*xi for xi in self.coords))**0.5
+
+    def grad(self):
+        return self.coords[1]/self.coords[0]
 
 class Matrix(object):
     def __init__(self, rows):
