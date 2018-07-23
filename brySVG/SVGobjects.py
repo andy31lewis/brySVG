@@ -11,7 +11,7 @@
 # ANY WARRANTY. See the GNU General Public License for more details.          #
 
 import browser.svg as svg
-from browser import alert
+from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
 
 def delete(element):
@@ -229,6 +229,20 @@ class PolygonObject(svg.polygon, SVGMixin):
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
         self.Update()
+
+    def containsPoint(self, point):
+        (x, y) = point
+        length = len(self.PointList)
+        counter = 0
+        (x1, y1) = self.PointList[0]
+        for i in range(1, length+1):
+            (x2, y2) = self.PointList[i%length]
+            if y>min(y1, y2) and y<=max(y1,y2) and y1!=y2 and x<max(x1, x2):
+                if x1==x2 or x <= x1 + (y-y1)*(x2-x1)/(y2-y1):
+                    print ((x1,y1), (x2,y2))
+                    counter += 1
+            (x1, y1) = (x2, y2)
+        return (counter)
         
 class RectangleObject(svg.rect, SVGMixin):
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
@@ -503,6 +517,21 @@ class PointObject(svg.circle, SVGMixin):
         self.attrs["cx"] = self._XY[0]
         self.attrs["cy"] = self._XY[1]
 
+class RegularPolygon(PolygonObject):
+    def __init__(self, sidecount, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+        angle = 2*pi/sidecount
+        radoffset = offsetangle*pi/180
+        if not radius: radius = sidelength/(2*sin(pi/sidecount))
+        if not centre: 
+            (x, y) = startpoint
+            centre = (x-radius*sin(radoffset), y+radius*cos(radoffset))
+        (cx, cy) = centre
+        self.PointList = []
+        for i in range(sidecount):
+            t = radoffset+i*angle
+            self.PointList.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
+        PolygonObject.__init__(self, self.PointList, linecolour, linewidth, fillcolour)
+
 class GroupObject(svg.g, SVGMixin):
     def __init__(self, objlist=[], id=None):
         svg.g.__init__(self)
@@ -560,7 +589,7 @@ class CanvasObject(svg.svg):
 
     def fitContents(self):
         bbox = self.getBBox()
-        bboxstring = str(bbox.x*1.01)+" "+str(bbox.y*1.01)+" "+str(bbox.width*1.01)+" "+str(bbox.height*1.01)
+        bboxstring = str(bbox.x-10)+" "+str(bbox.y-10)+" "+str(bbox.width+20)+" "+str(bbox.height+20)
         self.attrs["viewBox"] = bboxstring
         #self.attrs["preserveAspectRatio"] = "none"
 
@@ -630,7 +659,7 @@ class CanvasObject(svg.svg):
         self.StartPoint = self.getSVGcoords(event)
         if self.MouseAction == 1: return
         if self.MouseAction in [2, 5]:
-            self.TransformOrigin = PointObject(self.MouseOwnerCentre, colour="blue", pointsize=5)
+            self.TransformOrigin = PointObject(self.MouseOwnerCentre, colour="blue", pointsize=3)
         elif self.MouseAction == 3:
             self.TransformOrigin = LineObject([(cx, bbox.y), (cx, bbox.y+bbox.height)], linecolour="blue", linewidth=2)
         elif self.MouseAction == 4:
@@ -643,7 +672,11 @@ class CanvasObject(svg.svg):
         if self.TransformOrigin:
             delete(self.TransformOrigin)
             self.TransformOrigin = None
-        if self.Snap and getattr(self.MouseOwner, "PointList", None):
+        if not (getattr(self.MouseOwner, "PointList", None) and self.Snap):
+            self.MouseOwner = None
+            return
+        if self.RotateSnap:
+            bestdx = bestdy = None
             for objid in self.ObjectDict:
                 if objid == self.MouseOwner.id: continue
                 if not getattr(self.ObjectDict[objid], "PointList", None): continue
@@ -651,37 +684,55 @@ class CanvasObject(svg.svg):
                     for point2 in self.MouseOwner.PointList:
                         (dx, dy) = point1 - point2
                         if abs(dx) < self.Snap and abs(dy) < self.Snap:
-                            if self.RotateSnap:
-                                pl1 = self.ObjectDict[objid].PointList
-                                L = len(pl1)
-                                i = pl1.index(point1)
-                                vec1a = pl1[(i+1)%L] - point1
-                                vec1b = pl1[(i-1)%L] - point1
-                                grads1 = [vec1a.grad(), vec1b.grad()]
-                                pl2 = self.MouseOwner.PointList
-                                L = len(pl2)
-                                j = pl2.index(point2)
-                                vec2a = pl2[(j+1)%L] - point2
-                                vec2b = pl2[(j-1)%L] - point2
-                                grads2 = [vec2a.grad(), vec2b.grad()]
-                                print (grads1, grads2)
-                                for g1 in grads1:
-                                    for g2 in grads2:
-                                        diff = 1000 if g1*g2 == -1 else (g1-g2)/(1+g1*g2)
-                                        if abs(diff) < self.RotateSnap:
-                                            print (pl1[i], pl2[j], g1, g2, diff)
-                                            matrix = self.createSVGMatrix()
-                                            matrix = matrix.rotateFromVector(1, diff)
-                                            self.MouseOwner.matrixtransform(matrix)
-                                            print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
-                                            (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
-                                            print (dx, dy)
-                                            
-                                
+                            pl1 = self.ObjectDict[objid].PointList
+                            L = len(pl1)
+                            i = pl1.index(point1)
+                            vec1a = pl1[(i+1)%L] - point1
+                            vec1b = pl1[(i-1)%L] - point1
+                            angles1 = [vec1a.angle(), vec1b.angle()]
+                            pl2 = self.MouseOwner.PointList
+                            L = len(pl2)
+                            j = pl2.index(point2)
+                            vec2a = pl2[(j+1)%L] - point2
+                            vec2b = pl2[(j-1)%L] - point2
+                            angles2 = [vec2a.angle(), vec2b.angle()]
+                            print (angles1, angles2)
+                            for a1 in angles1:
+                                for a2 in angles2:
+                                    diff = a1-a2
+                                    absdiff = abs(diff)
+                                    testdiff = absdiff if absdiff < pi else 2*pi-absdiff
+                                    
+                                    if testdiff < self.RotateSnap*pi/180:
+                                        #print (pl1[i], pl2[j], g1, g2, diff)
+                                        matrix = self.createSVGMatrix()
+                                        matrix = matrix.rotate(diff*180/pi)
+                                        self.MouseOwner.matrixtransform(matrix)
+                                        print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
+                                        (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
+                                        print (dx, dy)
+                                        self.MouseOwner.translate((dx, dy))
+                                        self.MouseOwner = None
+                                        return
+                            if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
+            if bestdx: 
+                self.MouseOwner.translate((bestdx, bestdy))
+            self.MouseOwner = None
+            return
+
+        elif self.Snap:
+            for objid in self.ObjectDict:
+                if objid == self.MouseOwner.id: continue
+                if not getattr(self.ObjectDict[objid], "PointList", None): continue
+                for point1 in self.ObjectDict[objid].PointList:
+                    for point2 in self.MouseOwner.PointList:
+                        (dx, dy) = point1 - point2
+                        if abs(dx) < self.Snap and abs(dy) < self.Snap:
                             self.MouseOwner.translate((dx, dy))
                             self.MouseOwner = None
                             return
-        self.MouseOwner = None
+            self.MouseOwner = None
+                
                 
 
     def AddObject(self, svgobject):
@@ -773,8 +824,8 @@ class Point(object):
     def length(self):
         return (sum(xi*xi for xi in self.coords))**0.5
 
-    def grad(self):
-        return self.coords[1]/self.coords[0]
+    def angle(self):
+        return atan2(self.coords[1], self.coords[0])
 
 class Matrix(object):
     def __init__(self, rows):
