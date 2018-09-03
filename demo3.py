@@ -1,5 +1,5 @@
 from browser import document
-from brySVG import SVGobjects as SVG
+import brySVG as SVG
 
 def onRightClick(event):
     event.preventDefault()
@@ -12,7 +12,7 @@ data = [[[(0,0), (50, 50), (100,0)], 45, 0], [[(0,0), (50, 50), (100,0)], 45, 80
 
 canvas = SVG.CanvasObject("98vw", "95vh", "cyan")
 document <= canvas
-canvas.setMouseAction(1)
+canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
 canvas.Snap = 10
 canvas.bind("contextmenu", onRightClick)
 
