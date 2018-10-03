@@ -103,7 +103,7 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setRotate(angle, *centre)
             self.transformPoints(t.matrix)
-            print (t)
+            #print (t)
             if isinstance(self, (EllipseObject, RectangleObject)):
                 self.transform.baseVal.insertItemBefore(t, 0)
                 self.matrix = self.transform.baseVal.consolidate().matrix
@@ -134,7 +134,7 @@ class TransformMixin(object):
             else:
                 self.Update()
 
-    def xstretch(self, xscale, cx):
+    def xstretch(self, xscale, cx=0):
         if isinstance(self, GroupObject):
             for obj in self.ObjectList:
                 obj.xstretch(xscale, cx)
@@ -146,7 +146,7 @@ class TransformMixin(object):
             self.transformPoints(matrix)
             self.Update()
 
-    def ystretch(self, yscale, cy):
+    def ystretch(self, yscale, cy=0):
         if isinstance(self, GroupObject):
             for obj in self.ObjectList:
                 obj.ystretch(yscale, cy)
@@ -158,7 +158,7 @@ class TransformMixin(object):
             self.transformPoints(matrix)
             self.Update()
 
-    def enlarge(self, scalefactor, cx, cy):
+    def enlarge(self, scalefactor, cx=0, cy=0):
         if isinstance(self, GroupObject):
             for obj in self.ObjectList:
                 obj.enlarge(scalefactor, cx, cy)
@@ -196,7 +196,7 @@ class NonBezierMixin(object):
         self.PointList = [Point(coords) for coords in pointlist]
         self.Update()
 
-    def movepoint(self, coords):
+    def movePoint(self, coords):
        self.SetPoint(-1, coords)
 
     def SelectShape(self):
@@ -215,14 +215,14 @@ class PolyshapeMixin(object):
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
         self.Update()
-    
+
 class BezierMixin(object):
     def SetPointset(self, i, pointset):
         self.PointsetList[i] = pointset
         self.Update()
 
     def SetPointsets(self, pointsetlist):
-        self.PointsetList = pointsetlist        
+        self.PointsetList = pointsetlist
         self.Update()
 
     def SelectShape(self):
@@ -233,7 +233,7 @@ class BezierMixin(object):
         pointlist = [pointset[1] for pointset in self.PointsetList]
         self.Handles = GroupObject([Handle(self, i, coords) for i, coords in enumerate(pointlist)], "handles")
         self.Canvas <= self.Handles
-        
+
         controlhandles = []
         for i, (point0, point1, point2) in enumerate(self.PointsetList):
             if point0 is None: controlhandles.append((ControlHandle(self, i, 2, point2), ))
@@ -242,7 +242,7 @@ class BezierMixin(object):
         self.ControlHandles = controlhandles
         self.ControlHandlesGroup = GroupObject([ch for chset in controlhandles for ch in chset], "controlhandles")
         self.Canvas <= self.ControlHandlesGroup
-    
+
 class SmoothBezierMixin(object):
     def SetPointset(self, i, pointset):
         self.PointList[i] = pointset[1]
@@ -251,7 +251,7 @@ class SmoothBezierMixin(object):
 
     def SetPointsets(self, pointsetlist):
         self.PointList = [pointset[1] for pointset in pointsetlist]
-        self.PointsetList = pointsetlist        
+        self.PointsetList = pointsetlist
         self.Update()
 
     def SetPoint(self, i, point):
@@ -268,13 +268,13 @@ class SmoothBezierMixin(object):
         self.PointList.append(point)
         self.PointsetList = self.getpointsetlist(self.PointList)
         self.Update()
-   
+
     def DeletePoints(self, start, end):
         del self.PointList[slice(start, end)]
         self.PointsetList = self.getpointsetlist(self.PointList)
         self.Update()
 
-    def movepoint(self, coords):
+    def movePoint(self, coords):
        self.SetPoint(-1, coords)
 
     def calculatecontrolpoints(self, points):
@@ -286,11 +286,11 @@ class SmoothBezierMixin(object):
         if d1 == 0 or d2 == 0: return ((x2, y2), (x2, y2))
         cos1, sin1 = dx1/d1, dy1/d1
         cos2, sin2 = dx3/d2, dy3/d2
-        
+
         (c1x, c1y) = (x2 - d1*(cos1-cos2)/2, y2 - d1*(sin1-sin2)/2)
         (c2x, c2y) = (x2 + d2*(cos1-cos2)/2, y2 + d2*(sin1-sin2)/2)
         c1 = ((c1x+x2)/2, (c1y+y2)/2)
-        c2 = ((c2x+x2)/2, (c2y+y2)/2)        
+        c2 = ((c2x+x2)/2, (c2y+y2)/2)
         return (c1, c2)
 
 class LineObject(svg.line, TransformMixin, NonBezierMixin):
@@ -614,27 +614,32 @@ class CanvasObject(svg.svg):
         t.setTranslate(*vector)
         element.transform.baseVal.insertItemBefore(t, 0)
         return t.matrix
-        
+
+    def scaleElement(self, element, xscale, yscale):
+        t = svgbase.createSVGTransform()
+        t.setScale(xscale, yscale)
+        element.transform.baseVal.insertItemBefore(t, 0)
+        return t.matrix
+
     def setMouseTransformType(self, n):
         self.MouseTransformType = n
         self.style.cursor = self.Cursors[n]
-    
+
     def onRightClick(self, event):
         event.preventDefault()
 
     def onDragStart(self, event):
-        event.preventDefault()        
-    
+        event.preventDefault()
+
     def onLeftDown(self, event):
         if event.button > 0: return
         if self.MouseMode == MouseMode.TRANSFORM:
             if self.MouseTransformType == 0 or event.target.id not in self.ObjectDict: return
             self.prepareMouseTransform(event)
-        
-        elif self.MouseMode == MouseMode.DRAW:  
-            print (self.Tool)   
+
+        elif self.MouseMode == MouseMode.DRAW:
+            #print (self.Tool)
             if self.MouseOwner:
-                print 
                 if self.MouseOwner.ShapeType in ("polygon", "polyline", "bezier", "closedbezier"):
                     coords = self.getSVGcoords(event)
                     self.MouseOwner.AppendPoint(coords)
@@ -643,13 +648,13 @@ class CanvasObject(svg.svg):
                 self.createObject(coords)
 
         elif self.MouseMode == MouseMode.EDIT:
-            print (event.target.id)
+            #print (event.target.id)
             if event.target.id in self.ObjectDict:
                 self.ObjectDict[event.target.id].SelectShape()
             else:
                 if self.SelectedShape:
                     self.DeSelectShape()
-        
+
     def onMouseMove(self, event):
         if self.MouseMode == MouseMode.TRANSFORM:
             if not self.MouseOwner or self.MouseTransformType == 0: return
@@ -658,27 +663,30 @@ class CanvasObject(svg.svg):
             #print (self.MouseOwner)
             if self.MouseOwner:
                 coords = self.getSVGcoords(event)
-                self.MouseOwner.movepoint(coords)
+                self.MouseOwner.movePoint(coords)
 
     def onLeftUp(self, event):
         if event.button > 0: return
         if self.MouseMode == MouseMode.TRANSFORM:
-            print (self.MouseTransformType, event.button, event.target, event.target.id)
+            #print (self.MouseTransformType, event.button, event.target, event.target.id)
             if self.MouseTransformType == 0: return
             self.endMouseTransform(event)
         elif self.MouseMode == MouseMode.EDIT:
+            try:
+                self.MouseOwner.onLeftUp()
+            except AttributeError:
+                pass
             self.MouseOwner = None
-    
+
     def onDoubleClick(self,event):
         if event.button > 0 or self.MouseMode != MouseMode.DRAW: return
         if self.MouseOwner:
             if self.Tool in ["polygon", "polyline", "bezier", "closedbezier"]:
                 self.MouseOwner.DeletePoints(-2, None)
             self.MouseOwner = None
-            self.Tool = "select"
-            
+
     def createObject(self, coords):
-        print (coords)
+        #print (coords)
         self.MouseOwner = self.ShapeTypes[self.Tool](pointlist=[coords, coords], linecolour=self.PenColour, linewidth=self.PenWidth, fillcolour=self.FillColour)
         self.AddObject(self.MouseOwner)
         self.MouseOwner.ShapeType = self.Tool
@@ -686,7 +694,7 @@ class CanvasObject(svg.svg):
     def prepareMouseTransform(self, event):
         svgobj = self.ObjectDict[event.target.id]
         while getattr(svgobj, "Group", None):
-            svgobj = svgobj.Group 
+            svgobj = svgobj.Group
         self <= svgobj
         self.MouseOwner = svgobj
         bbox = self.MouseOwner.getBBox()
@@ -700,7 +708,7 @@ class CanvasObject(svg.svg):
         elif self.MouseTransformType == 4:
             self.TransformOrigin = LineObject([(bbox.x, cy), (bbox.x+bbox.width, cy)], linecolour="blue", linewidth=2)
         self <= self.TransformOrigin
-            
+
     def doMouseTransform(self, event):
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
@@ -708,7 +716,7 @@ class CanvasObject(svg.svg):
         (cx, cy) = self.MouseOwnerCentre
         vec1 = (x1, y1) = self.StartPoint - self.MouseOwnerCentre
         vec2 = (x2, y2) = currentcoords - self.MouseOwnerCentre
-        print (event.clientX, event.clientY, self.StartPoint, currentcoords)
+        #print (event.clientX, event.clientY, self.StartPoint, currentcoords)
         self.StartPoint = currentcoords
         if self.MouseTransformType == TransformType.TRANSLATE:
             self.MouseOwner.translate(offset)
@@ -757,7 +765,7 @@ class CanvasObject(svg.svg):
                                 diff = a1-a2
                                 absdiff = abs(diff)
                                 testdiff = absdiff if absdiff < pi else 2*pi-absdiff
-                                
+
                                 if testdiff < self.RotateSnap*pi/180:
                                     #print (pl1[i], pl2[j], g1, g2, diff)
                                     matrix = self.createSVGMatrix()
@@ -769,7 +777,7 @@ class CanvasObject(svg.svg):
                                     self.MouseOwner.translate((dx, dy))
                                     return
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
-        if bestdx: 
+        if bestdx:
             self.MouseOwner.translate((bestdx, bestdy))
         self.MouseOwner = None
 
@@ -803,20 +811,20 @@ class CanvasObject(svg.svg):
                 delete(self.SelectedShape)
                 del self.ObjectDict[self.SelectedShape.id]
                 self.SelectedShape = None
-                
+
 class Handle(PointObject):
     def __init__(self, owner, index, coords):
         PointObject.__init__(self, coords, "red", 5)
         self.owner = owner
         self.index = index
         self.bind("mousedown", self.Select)
-    
+
     def Select(self, event):
         event.stopPropagation()
         if self.owner.Canvas.MouseOwner == None:
             self.owner.Canvas.MouseOwner = self
 
-    def movepoint(self, coords):
+    def movePoint(self, coords):
         offset = coords - self.XY
         self.XY = coords
         #print ("self.XY", self.XY)
@@ -836,13 +844,13 @@ class ControlHandle(PointObject):
         self.index = index
         self.subindex = subindex
         self.bind("mousedown", self.Select)
-    
+
     def Select(self, event):
         event.stopPropagation()
         if self.owner.Canvas.MouseOwner == None:
             self.owner.Canvas.MouseOwner = self
 
-    def movepoint(self, newcoords):
+    def movePoint(self, newcoords):
         self.XY = newcoords
 
         pointset = list(self.owner.PointsetList[self.index])
@@ -919,3 +927,17 @@ class Point(object):
 
     def angle(self):
         return atan2(self.coords[1], self.coords[0])
+
+class Matrix(object):
+    def __init__(self, rows):
+        self.rows = rows
+        self.cols = [Point([self.rows[i][j] for i in range(len(self.rows))]) for j in range(len(self.rows[0]))]
+
+    def __str__(self):
+        return str("\n".join(str(row) for row in self.rows))
+
+    def __rmul__(self, other):
+        if isinstance(other, (list, tuple)):
+            return [Point([p*col for col in self.cols]) for p in other]
+        else:
+            return Point([other*col for col in self.cols])
