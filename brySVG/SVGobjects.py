@@ -103,9 +103,12 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setRotate(angle, *centre)
             self.transformPoints(t.matrix)
-            if isinstance(self, (EllipseObject, RectangleObject)):
+            if isinstance(self, (EllipseObject, )):
                 self.transform.baseVal.insertItemBefore(t, 0)
                 self.matrix = self.transform.baseVal.consolidate().matrix
+            elif isinstance(self, RectangleObject):
+                self.angle += angle
+                self.Update()
             else:
                 self.Update()
 
@@ -117,12 +120,14 @@ class TransformMixin(object):
             (cx, cy) = centre
             (x1, y1) = vec1
             (x2, y2) = vec2
+            (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
+            angle = atan2(y3, x3)*180/pi
             matrix = svgbase.createSVGMatrix()
             matrix = matrix.translate(cx, cy)
-            matrix = matrix.rotateFromVector(x1*x2+y1*y2, x1*y2-x2*y1)
+            matrix = matrix.rotateFromVector(x3, y3)
             matrix = matrix.translate(-cx, -cy)
             self.transformPoints(matrix)
-            if isinstance(self, (EllipseObject, RectangleObject)):
+            if isinstance(self, (EllipseObject, )):
                 if not self.matrix: self.matrix = svgbase.createSVGMatrix()
                 print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
                 self.matrix = matrix.multiply(self.matrix)
@@ -130,6 +135,9 @@ class TransformMixin(object):
                 t = svgbase.createSVGTransform()
                 t.setMatrix(self.matrix)
                 self.transform.baseVal.initialize(t)
+            elif isinstance(self, RectangleObject):
+                self.angle += angle
+                self.Update()
             else:
                 self.Update()
 
@@ -374,7 +382,13 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         self.angle = 0
 
     def Update(self):
-        basepointlist = self.transformedPointList(self.matrix.inverse()) if self.matrix else self.PointList
+        [(x1, y1), (x2, y2)] = self.PointList
+        centre = (cx, cy) = Point(((x1+x2)/2, (y1+y2)/2))
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.transform.baseVal.initialize(t)
+        
+        basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["x"] = x1
         self.attrs["y"] = y1
