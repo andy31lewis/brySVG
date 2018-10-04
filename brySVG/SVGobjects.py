@@ -371,7 +371,7 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         [(x1, y1), (x2, y2)] = pointlist
         svg.rect.__init__(self, x=x1, y=y1, width=abs(x2-x1), height=abs(y2-y1), style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointList = [Point(coords) for coords in pointlist]
-        self.matrix = None
+        self.angle = 0
 
     def Update(self):
         basepointlist = self.transformedPointList(self.matrix.inverse()) if self.matrix else self.PointList
