@@ -162,23 +162,6 @@ class TransformMixin(object):
             self.transformPoints(matrix)
             self.Update()
 
-    def matrixtransform(self, matrix):
-        if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
-                obj.matrixtransform(matrix)
-        else:
-            self.transformPoints(matrix)
-            if isinstance(self, (EllipseObject, RectangleObject)):
-                if not self.matrix: self.matrix = svgbase.createSVGMatrix()
-                #print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
-                self.matrix = matrix.multiply(self.matrix)
-                #print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
-                t = svgbase.createSVGTransform()
-                t.setMatrix(self.matrix)
-                self.transform.baseVal.initialize(t)
-            else:
-                self.Update()
-
 class NonBezierMixin(object):
     def SetPoint(self, i, point):
         self.PointList[i] = point
@@ -328,18 +311,18 @@ class TextObject(svg.text):
 
 class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixin):
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour=None):
-        plist = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
-        svg.polyline.__init__(self, points=plist, fill="none", style={"stroke":linecolour, "strokeWidth":linewidth})
+        svg.polyline.__init__(self, fill="none", style={"stroke":linecolour, "strokeWidth":linewidth})
         self.PointList = [Point(coords) for coords in pointlist]
+        self.Update()
 
     def Update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
 
 class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin):
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        plist = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
-        svg.polygon.__init__(self, points=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.polygon.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointList = [Point(coords) for coords in pointlist]
+        self.Update()
 
     def Update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
@@ -359,11 +342,11 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
         return (counter)
         
 class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
-    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        [(x1, y1), (x2, y2)] = pointlist
-        svg.rect.__init__(self, x=x1, y=y1, width=abs(x2-x1), height=abs(y2-y1), style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+        svg.rect.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointList = [Point(coords) for coords in pointlist]
-        self.angle = 0
+        self.angle = angle
+        self.Update()
 
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
@@ -380,11 +363,11 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         self.attrs["height"] = abs(y2-y1)
         
 class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
-    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        [(x1, y1), (x2, y2)] = pointlist
-        svg.ellipse.__init__(self, cx=(x1+x2)/2, cy=(y1+y2)/2, rx=abs(x2-x1)/2, ry=abs(y2-y1)/2, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+        svg.ellipse.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointList = [Point(coords) for coords in pointlist]
-        self.angle = 0
+        self.angle = angle
+        self.Update()
     
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
@@ -403,13 +386,12 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
 class CircleObject(svg.circle, TransformMixin, NonBezierMixin):
     def __init__(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow"):
         if pointlist:
-            svg.circle.__init__(self, cx=0, cy=0, r=0, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
             self.PointList = [Point(coords) for coords in pointlist]
-            self.Update()
         else:
             (x, y) = centre
-            svg.circle.__init__(self, cx=x, cy=y, r=radius, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
             self.PointList = [Point((x, y)), Point((x+radius, y))]
+        svg.circle.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        self.Update()
 
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
@@ -421,12 +403,9 @@ class BezierObject(svg.path, BezierMixin, TransformMixin):
     def __init__(self, pointsetlist=[(None, (0,0), (0,0)), ((0,0), (0,0), None)], linecolour="black", linewidth=1, fillcolour=None):
         def toPoint(coords):
             return None if coords is None else Point(coords)
-        (dummy, (x1, y1), (c1x, c1y)) = pointsetlist[0]
-        ((c2x, c2y), (x2, y2), dummy) = pointsetlist[-1]
-        plist = ["M", x1, y1, "C", c1x, c1y]+[x for p in pointsetlist[1:-1] for c in p for x in c]+[c2x, c2y, x2, y2]
-        pstring = " ".join(str(x) for x in plist)
-        svg.path.__init__(self, d=pstring, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":None})
+        svg.path.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":None})
         self.PointsetList = [[toPoint(coords) for coords in pointset] for pointset in pointsetlist]
+        self.Update()
 
     def Update(self):
         (dummy, (x1, y1), (c1x, c1y)) = self.PointsetList[0]
@@ -436,10 +415,9 @@ class BezierObject(svg.path, BezierMixin, TransformMixin):
 
 class ClosedBezierObject(svg.path, BezierMixin, TransformMixin):
     def __init__(self, pointsetlist=[((0,0), (0,0), (0,0))], linecolour="black", linewidth=1, fillcolour="yellow"):
-        ((c1x, c1y), (x, y), (c2x, c2y)) = pointsetlist[0]
-        plist = "M"+str(x)+" "+str(y)+" C"+str(c2x)+" "+str(c2y)+" "+" ".join(str(x) for p in pointsetlist[1:] for c in p for x in c)+" "+" ".join(str(x) for x in (c1x, c1y, x, y))
-        svg.path.__init__(self, d=plist, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.path.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
+        self.Update()
 
     def Update(self):
         ((c1x, c1y), (x, y), (c2x, c2y)) = self.PointsetList[0]
@@ -703,7 +681,7 @@ class CanvasObject(svg.svg):
         self.MouseOwner = svgobj
         bbox = self.MouseOwner.getBBox()
         (cx, cy) = self.MouseOwnerCentre = Point((bbox.x+bbox.width/2, bbox.y+bbox.height/2))
-        print ((bbox.x, bbox.y), (cx, cy), (bbox.x+bbox.width, bbox.y+bbox.height))
+        #print ((bbox.x, bbox.y), (cx, cy), (bbox.x+bbox.width, bbox.y+bbox.height))
         self.StartPoint = self.getSVGcoords(event)
         if self.MouseTransformType == 1: return
         if self.MouseTransformType in [2, 5]:
@@ -773,9 +751,7 @@ class CanvasObject(svg.svg):
 
                                 if testdiff < self.RotateSnap*pi/180:
                                     #print (pl1[i], pl2[j], g1, g2, diff)
-                                    matrix = self.createSVGMatrix()
-                                    matrix = matrix.rotate(diff*180/pi)
-                                    self.MouseOwner.matrixtransform(matrix)
+                                    self.MouseOwner.rotate(diff*180/pi)
                                     print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
                                     (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
                                     print (dx, dy)
