@@ -103,14 +103,9 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setRotate(angle, *centre)
             self.transformPoints(t.matrix)
-            if isinstance(self, (EllipseObject, )):
-                self.transform.baseVal.insertItemBefore(t, 0)
-                self.matrix = self.transform.baseVal.consolidate().matrix
-            elif isinstance(self, RectangleObject):
+            if isinstance(self, (EllipseObject, RectangleObject)):
                 self.angle += angle
-                self.Update()
-            else:
-                self.Update()
+            self.Update()
 
     def rotateByVectors(self, vec1, vec2, centre=(0, 0)):
         if isinstance(self, GroupObject):
@@ -127,19 +122,9 @@ class TransformMixin(object):
             matrix = matrix.rotateFromVector(x3, y3)
             matrix = matrix.translate(-cx, -cy)
             self.transformPoints(matrix)
-            if isinstance(self, (EllipseObject, )):
-                if not self.matrix: self.matrix = svgbase.createSVGMatrix()
-                print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
-                self.matrix = matrix.multiply(self.matrix)
-                print (self.matrix.a, self.matrix.b, self.matrix.c, self.matrix.d, self.matrix.e, self.matrix.f)
-                t = svgbase.createSVGTransform()
-                t.setMatrix(self.matrix)
-                self.transform.baseVal.initialize(t)
-            elif isinstance(self, RectangleObject):
+            if isinstance(self, (EllipseObject, RectangleObject)):
                 self.angle += angle
-                self.Update()
-            else:
-                self.Update()
+            self.Update()
 
     def xstretch(self, xscale, cx=0):
         if isinstance(self, GroupObject):
@@ -152,7 +137,6 @@ class TransformMixin(object):
             matrix = matrix.translate(-cx, 0)
             self.transformPoints(matrix)
             self.Update()
-            print ([point.coords for point in self.PointList])
 
     def ystretch(self, yscale, cy=0):
         if isinstance(self, GroupObject):
@@ -400,10 +384,16 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
         [(x1, y1), (x2, y2)] = pointlist
         svg.ellipse.__init__(self, cx=(x1+x2)/2, cy=(y1+y2)/2, rx=abs(x2-x1)/2, ry=abs(y2-y1)/2, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.PointList = [Point(coords) for coords in pointlist]
-        self.matrix = None
+        self.angle = 0
     
     def Update(self):
-        basepointlist = self.transformedPointList(self.matrix.inverse()) if self.matrix else self.PointList
+        [(x1, y1), (x2, y2)] = self.PointList
+        centre = (cx, cy) = Point(((x1+x2)/2, (y1+y2)/2))
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.transform.baseVal.initialize(t)
+        
+        basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["cx"]=(x1+x2)/2
         self.attrs["cy"]=(y1+y2)/2
