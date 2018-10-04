@@ -14,7 +14,7 @@ import browser.svg as svg
 from browser import document
 from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
-t = svgbase.createSVGTransform()
+#t = svgbase.createSVGTransform()
 
 def delete(element):
     element.parentNode.removeChild(element)
@@ -103,7 +103,6 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setRotate(angle, *centre)
             self.transformPoints(t.matrix)
-            #print (t)
             if isinstance(self, (EllipseObject, RectangleObject)):
                 self.transform.baseVal.insertItemBefore(t, 0)
                 self.matrix = self.transform.baseVal.consolidate().matrix
@@ -145,6 +144,7 @@ class TransformMixin(object):
             matrix = matrix.translate(-cx, 0)
             self.transformPoints(matrix)
             self.Update()
+            print ([point.coords for point in self.PointList])
 
     def ystretch(self, yscale, cy=0):
         if isinstance(self, GroupObject):
@@ -699,6 +699,7 @@ class CanvasObject(svg.svg):
         self.MouseOwner = svgobj
         bbox = self.MouseOwner.getBBox()
         (cx, cy) = self.MouseOwnerCentre = Point((bbox.x+bbox.width/2, bbox.y+bbox.height/2))
+        print ((bbox.x, bbox.y), (cx, cy), (bbox.x+bbox.width, bbox.y+bbox.height))
         self.StartPoint = self.getSVGcoords(event)
         if self.MouseTransformType == 1: return
         if self.MouseTransformType in [2, 5]:
@@ -827,7 +828,6 @@ class Handle(PointObject):
     def movePoint(self, coords):
         offset = coords - self.XY
         self.XY = coords
-        #print ("self.XY", self.XY)
         if isinstance(self.owner, BezierMixin):
             pointset = [None, self.XY, None]
             for ch in self.owner.ControlHandles[self.index]:
