@@ -14,7 +14,6 @@ import browser.svg as svg
 from browser import document
 from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
-#t = svgbase.createSVGTransform()
 
 def delete(element):
     element.parentNode.removeChild(element)
@@ -168,7 +167,7 @@ class NonBezierMixin(object):
         self.Update()
 
     def SetPoints(self, pointlist):
-        self.PointList = [Point(coords) for coords in pointlist]
+        self.PointList = pointlist
         self.Update()
 
     def movePoint(self, coords):
@@ -235,7 +234,7 @@ class SmoothBezierMixin(object):
         self.Update()
 
     def SetPoints(self, pointlist):
-        self.PointList = [Point(coords) for coords in pointlist]
+        self.PointList = pointlist
         self.PointsetList = self.getpointsetlist(pointlist)
         self.Update()
 
@@ -266,7 +265,7 @@ class SmoothBezierMixin(object):
         (c2x, c2y) = (x2 + d2*(cos1-cos2)/2, y2 + d2*(sin1-sin2)/2)
         c1 = ((c1x+x2)/2, (c1y+y2)/2)
         c2 = ((c2x+x2)/2, (c2y+y2)/2)
-        return (c1, c2)
+        return (Point(c1), Point(c2))
 
 class LineObject(svg.line, TransformMixin, NonBezierMixin):
     def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None):
@@ -350,7 +349,7 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
 
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
-        centre = (cx, cy) = Point(((x1+x2)/2, (y1+y2)/2))
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
@@ -371,7 +370,7 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
     
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
-        centre = (cx, cy) = Point(((x1+x2)/2, (y1+y2)/2))
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
@@ -425,9 +424,9 @@ class ClosedBezierObject(svg.path, BezierMixin, TransformMixin):
 
 class SmoothBezierObject(SmoothBezierMixin, BezierObject):
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
-        pointsetlist = self.getpointsetlist(pointlist)
-        BezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
         self.PointList = [Point(coords) for coords in pointlist]
+        pointsetlist = self.getpointsetlist(self.PointList)
+        BezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
             
     def getpointsetlist(self, pointlist):
         if len(pointlist) == 2: return[[None]+pointlist, pointlist+[None]]
@@ -436,18 +435,18 @@ class SmoothBezierObject(SmoothBezierMixin, BezierObject):
             if i == 1:
                 (x1, y1) = pointlist[0]
                 (x2, y2) = c1
-                pointsetlist = [(None, pointlist[0], ((x1+x2)/2, (y1+y2)/2))]
+                pointsetlist = [(None, pointlist[0], Point(((x1+x2)/2, (y1+y2)/2)))]
             pointsetlist.append((c1, pointlist[i], c2))
         (x1, y1) = pointlist[-1]
         (x2, y2) = c2
-        pointsetlist.append((((x1+x2)/2, (y1+y2)/2), pointlist[-1], None))
+        pointsetlist.append((Point(((x1+x2)/2, (y1+y2)/2)), pointlist[-1], None))
         return pointsetlist
 
 class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        pointsetlist = self.getpointsetlist(pointlist)
-        ClosedBezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
         self.PointList = [Point(coords) for coords in pointlist]
+        pointsetlist = self.getpointsetlist(self.PointList)
+        ClosedBezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
             
     def getpointsetlist(self, pointlist):
         pointlist = [pointlist[-1]]+pointlist[:]+[pointlist[0]]
@@ -455,7 +454,6 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
         for i in range(1, len(pointlist)-1):
             (c1, c2) = self.calculatecontrolpoints(pointlist[i-1:i+2])
             pointsetlist.append((c1, pointlist[i], c2))
-        #print (pointsetlist)
         return pointsetlist
 
 class PointObject(svg.circle, TransformMixin):
@@ -620,7 +618,6 @@ class CanvasObject(svg.svg):
             self.prepareMouseTransform(event)
 
         elif self.MouseMode == MouseMode.DRAW:
-            #print (self.Tool)
             if self.MouseOwner:
                 if self.MouseOwner.ShapeType in ("polygon", "polyline", "bezier", "closedbezier"):
                     coords = self.getSVGcoords(event)
@@ -630,7 +627,6 @@ class CanvasObject(svg.svg):
                 self.createObject(coords)
 
         elif self.MouseMode == MouseMode.EDIT:
-            #print (event.target.id)
             if event.target.id in self.ObjectDict:
                 self.ObjectDict[event.target.id].SelectShape()
             else:
@@ -642,7 +638,6 @@ class CanvasObject(svg.svg):
             if not self.MouseOwner or self.MouseTransformType == 0: return
             self.doMouseTransform(event)
         else:
-            #print (self.MouseOwner)
             if self.MouseOwner:
                 coords = self.getSVGcoords(event)
                 self.MouseOwner.movePoint(coords)
@@ -650,7 +645,6 @@ class CanvasObject(svg.svg):
     def onLeftUp(self, event):
         if event.button > 0: return
         if self.MouseMode == MouseMode.TRANSFORM:
-            #print (self.MouseTransformType, event.button, event.target, event.target.id)
             if self.MouseTransformType == 0: return
             self.endMouseTransform(event)
         elif self.MouseMode == MouseMode.EDIT:
@@ -668,7 +662,6 @@ class CanvasObject(svg.svg):
             self.MouseOwner = None
 
     def createObject(self, coords):
-        #print (coords)
         self.MouseOwner = self.ShapeTypes[self.Tool](pointlist=[coords, coords], linecolour=self.PenColour, linewidth=self.PenWidth, fillcolour=self.FillColour)
         self.AddObject(self.MouseOwner)
         self.MouseOwner.ShapeType = self.Tool
@@ -681,7 +674,6 @@ class CanvasObject(svg.svg):
         self.MouseOwner = svgobj
         bbox = self.MouseOwner.getBBox()
         (cx, cy) = self.MouseOwnerCentre = Point((bbox.x+bbox.width/2, bbox.y+bbox.height/2))
-        #print ((bbox.x, bbox.y), (cx, cy), (bbox.x+bbox.width, bbox.y+bbox.height))
         self.StartPoint = self.getSVGcoords(event)
         if self.MouseTransformType == 1: return
         if self.MouseTransformType in [2, 5]:
@@ -699,7 +691,6 @@ class CanvasObject(svg.svg):
         (cx, cy) = self.MouseOwnerCentre
         vec1 = (x1, y1) = self.StartPoint - self.MouseOwnerCentre
         vec2 = (x2, y2) = currentcoords - self.MouseOwnerCentre
-        #print (event.clientX, event.clientY, self.StartPoint, currentcoords)
         self.StartPoint = currentcoords
         if self.MouseTransformType == TransformType.TRANSLATE:
             self.MouseOwner.translate(offset)
@@ -834,17 +825,16 @@ class ControlHandle(PointObject):
         self.XY = newcoords
 
         pointset = list(self.owner.PointsetList[self.index])
-        #if len(pointset) == 3:
         if isinstance(self.owner, SmoothBezierMixin) and None not in pointset:
-            point = Point(pointset[1])
+            point = pointset[1]
             thisoffset = newcoords - point
-            otheroffset = Point(pointset[2-self.subindex]) - point
+            otheroffset = pointset[2-self.subindex] - point
             newoffset = thisoffset*(otheroffset.length()/thisoffset.length())
             newothercoords = point-newoffset
-            pointset[2-self.subindex] = newothercoords.coords
+            pointset[2-self.subindex] = newothercoords
             otherindex = 0 if self.subindex==2 else 1
             self.owner.ControlHandles[self.index][otherindex].XY = newothercoords
-        pointset[self.subindex] = newcoords.coords
+        pointset[self.subindex] = newcoords
         self.owner.SetPointset(self.index, tuple(pointset))
 
 class Point(object):
