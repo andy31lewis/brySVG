@@ -172,13 +172,14 @@ class TransformMixin(object):
             matrix = matrix.translate(0, -cy)
             self.matrixTransform(matrix)
 
-    def enlarge(self, scalefactor, cx=0, cy=0):
-        '''Enlarge object by scale factor scalefactor, with centre (cx, cy).
+    def enlarge(self, scalefactor, centre):
+        '''Enlarge object by scale factor scalefactor, from centre.
         If cx and cy are not given, the centre is the origin.'''
         if isinstance(self, GroupObject):
             for obj in self.ObjectList:
-                obj.enlarge(scalefactor, cx, cy)
+                obj.enlarge(scalefactor, centre)
         else:
+            (cx, cy) = centre
             matrix = svgbase.createSVGMatrix()
             matrix = matrix.translate(cx, cy)
             matrix = matrix.scale(scalefactor)
@@ -348,7 +349,7 @@ class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixi
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
 
 class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin):
-    '''Wrapper for SVG polyline. Parameter:
+    '''Wrapper for SVG polygon. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         svg.polygon.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
@@ -377,8 +378,8 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         
         basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
-        self.attrs["x"] = x1
-        self.attrs["y"] = y1
+        self.attrs["x"] = x2 if x2<x1 else x1
+        self.attrs["y"] = y2 if y2<y1 else y1
         self.attrs["width"] = abs(x2-x1)
         self.attrs["height"] = abs(y2-y1)
         
@@ -686,6 +687,7 @@ class CanvasObject(svg.svg):
         '''Clear all elements from the canvas'''
         while self.firstChild:
             self.removeChild(self.firstChild)
+        self.ObjectDict = {}
 
     def rotateElement(self, element, angle, centre=None):
         '''Rotate an element clockwise by angle degrees around centre.
@@ -818,7 +820,7 @@ class CanvasObject(svg.svg):
         elif self.MouseTransformType is TransformType.YSTRETCH:
             self.MouseOwner.ystretch(y2/y1, cy)
         elif self.MouseTransformType is TransformType.ENLARGE:
-            self.MouseOwner.enlarge(hypot(x2, y2)/hypot(x1, y1), cx, cy)
+            self.MouseOwner.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
 
     def endMouseTransform(self, event):
         if self.TransformOrigin:
