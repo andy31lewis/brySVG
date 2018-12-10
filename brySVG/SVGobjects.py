@@ -9,24 +9,20 @@
 # MA 02111-1307 USA                                                           #
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
-
-import browser.svg as svg
 from browser import document
+import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
-from enum import Enum
 
-class CycleEnum(Enum):
-    def next(self):
-        cls = self.__class__
-        members = list(cls)
-        index = members.index(self) + 1
-        if index >= len(members):
-            index = 0
-        return members[index]    
+class Enum(list):
+    def __init__(self, name, string):
+        values = string.split()
+        for i, value in enumerate(values):
+            setattr(self, value, i)
+            self.append(i)
 
-MouseMode = CycleEnum('MouseMode', 'NONE TRANSFORM DRAW EDIT')
-TransformType = CycleEnum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
+MouseMode = Enum('MouseMode', 'NONE TRANSFORM DRAW EDIT')
+TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
 
 def delete(element):
     element.parentNode.removeChild(element)
@@ -612,6 +608,7 @@ class CanvasObject(svg.svg):
         Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape.
         (For Bezier shapes there are also "control handles" to control the curvature.)
         In this mode, canvas.Tool will normally be set to "select".
+        While a shape is selected, pressing the DEL key on the keyboard will delete the shape.
         canvas.SelectedShape is the shape curently being edited.
         Use canvas.DeSelectShape to stop editing a shape and hide the handles.
     
@@ -624,7 +621,7 @@ class CanvasObject(svg.svg):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
         if id: self.id = id
         self.ShapeTypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject, "rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject, "bezier":SmoothBezierObject, "closedbezier":SmoothClosedBezierObject}
-        self.Cursors = ["dummy", "auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
+        self.Cursors = ["auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
         #for tt in TransformType: self.setMouseTransformType(tt)
         self.ObjectDict = {}
         self.MouseMode = MouseMode.TRANSFORM
@@ -720,7 +717,7 @@ class CanvasObject(svg.svg):
     def setMouseTransformType(self, mtt):
         '''Set canvas.MouseTransformType and show the appropriate cursor.'''
         self.MouseTransformType = mtt
-        self.style.cursor = self.Cursors[mtt.value]
+        self.style.cursor = self.Cursors[mtt]
 
     def onRightClick(self, event):
         event.preventDefault()

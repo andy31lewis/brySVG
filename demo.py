@@ -11,6 +11,7 @@ for i in range(1,8):
     rgb1, rgb2 = ws.hwbtorgb(60+i*200,0.5,0)[1], ws.hwbtorgb(60+i*200,0.4,0.1)[1]
     pages.append(DemoPage("Demo "+str(i), "rgb({},{},{})".format(*rgb1), id="demo"+str(i)))
     pages.append(ws.NotebookPage("Code "+str(i), "rgb({},{},{})".format(*rgb2), html.TEXTAREA(open("demo"+str(i)+".py").read()), id="code"+str(i)))
+document.select("body")[0].innerHTML = ""
 document <= ws.Notebook(pages)
 
 introtext = [

@@ -1,13 +1,15 @@
 from browser import document
 import brySVG as SVG
+from itertools import cycle
 
 def onRightClick(event):
     event.preventDefault()
-    canvas.setMouseTransformType(canvas.MouseTransformType.next())
+    canvas.setMouseTransformType(next(transformcycle))
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo2"] <= canvas
 canvas.bind("contextmenu", onRightClick)
+transformcycle = cycle(SVG.TransformType)
 
 tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (50,0), (200,50))]),
         SVG.GroupObject([SVG.PolygonObject([(50,25), (0,50), (50,75), (100,50)]),
@@ -24,3 +26,4 @@ for i, tile in enumerate(tiles):
     canvas.AddObject(tile)
     tile.translate((i*100, i*100))
 canvas.fitContents()
+canvas.setMouseTransformType(next(transformcycle))

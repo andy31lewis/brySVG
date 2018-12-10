@@ -156,6 +156,7 @@ The stroke, stroke-width and fill of the shape are determined by the values of b
 
 ### canvas.MouseMode = MouseMode.EDIT
 Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape. (For Bezier shapes there are also "control handles" to control the curvature.) In this mode, `canvas.Tool` will normally be set to `select`.  
+While a shape is selected, pressing the `DEL` key on the keyboard will delete the shape.  
 `canvas.SelectedShape` is the shape curently being edited. Use `canvas.DeSelectShape()` to stop editing a shape and hide the handles.
     
 ### canvas.MouseMode = MouseMode.NONE
