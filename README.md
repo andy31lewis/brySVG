@@ -49,11 +49,11 @@ If `centre` is not given, it is the centre of the object's bounding box.
 Enlarge or stretch `element` by scale factors `xscale` and `yscale`, with centre (0, 0).
 If `yscale` is not given, it is equal to `xscale`, ie the element is enlarged without stretching.
 
-The CanvasObject also has various attributes which affect how mouse interaction works.  These are described in the section *Canvas Mouse Interaction* below.
+The CanvasObject also has various attributes which affect how mouse interaction works.  These are described in the section *__Canvas Mouse Interaction__* below.
 
 ## Shape Objects
 
-**Common Parameters**
+**Common Parameters**  
 `linecolour`: Colour of the edges of the object.  
 `linewidth`: Width of the edges in SVG units.  
 `fillcolour`: Colour of the inside of the object.
