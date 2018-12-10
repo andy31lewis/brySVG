@@ -1,4 +1,5 @@
-#brySVG
+# brySVG
+
 Classes for simplifying the use of SVG graphics in Brython projects.
 
 To use, download the zip, and move the brySVG folder into your own project folder.  Then just include `import brySVG` in your brython file.  
@@ -6,7 +7,8 @@ To use, download the zip, and move the brySVG folder into your own project folde
 
 Description of some of the classes:
 
-##CanvasObject
+## CanvasObject
+
 `CanvasObject(width, height, colour="white", id=None)`
 
 Wrapper for SVG svg element.  
@@ -16,7 +18,7 @@ Wrapper for SVG svg element.
 `colour`: the background colour  
 `id`: the DOM id
 
-**Methods**  
+### Methods  
 `setDimensions()`:
 If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes.
 
@@ -49,14 +51,14 @@ If `yscale` is not given, it is equal to `xscale`, ie the element is enlarged wi
 
 The CanvasObject also has various attributes which affect how mouse interaction works.  These are described in the section *Canvas Mouse Interaction* below.
 
-##Shape Objects
+## Shape Objects
 
 **Common Parameters**
 `linecolour`: Colour of the edges of the object.  
 `linewidth`: Width of the edges in SVG units.  
 `fillcolour`: Colour of the inside of the object.
 
-###PolygonObject, PolyLineObject
+### PolygonObject, PolyLineObject
 
 `PolygonObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
 `PolylineObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
@@ -64,7 +66,7 @@ Wrappers for SVG polygon and polyline.
 Parameter:  
 `pointlist`: a list of coordinates for the vertices.
 
-###RectangleObject, EllipseObject
+### RectangleObject, EllipseObject
 
 `RectangleObject(pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow")`  
 Parameters:  
@@ -77,7 +79,7 @@ Parameters:
 `pointlist`: Two diagonally opposite corners of the bounding box of the ellipse.  
 `angle`: The angle (in degrees, clockwise) through which the edges of the bounding box are rotated from horizontal and vertical.
 
-###CircleObject, LineObject
+### CircleObject, LineObject
 
 `CircleObject(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow")`  
 Parameters:  
@@ -90,7 +92,7 @@ Parameters:
 `pointlist`: the two endpoints of the line.  
 `style`: Either `"solid"`, `"faintdash1"` or `"faintdash2"` (the last two are for use when drawing graph paper).
 
-###Bezier Objects
+### Bezier Objects
 
 `BezierObject(pointsetlist=[(None, (0,0), (0,0)), ((0,0), (0,0), None)], linecolour="black", linewidth=1, fillcolour=None)`  
 A general Bezier curve. Parameter:  
@@ -111,7 +113,7 @@ A smooth Bezier curve. Parameter:
 A closed smooth Bezier curve (the first vertex does not need to be repeated).  Parameter:
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
-###Common methods for shape objects
+### Common methods for shape objects
 
 These can be applied to all the shapes above.
 
@@ -129,11 +131,11 @@ These can be applied to all the shapes above.
 
 `enlarge(scalefactor, centre`): Enlarge object by scale factor `scalefactor`, with centre `centre`. If `centre` is not given, the centre is the origin.
 
-##Canvas Mouse Interaction
+## Canvas Mouse Interaction
 
 The `CanvasObject` has various attributes which control how it responds to mouse actions:
 
-###canvas.MouseMode = MouseMode.TRANSFORM
+### canvas.MouseMode = MouseMode.TRANSFORM
 In this mode, clicking on an object and dragging carries out the transformation which has been set using `canvas.setMouseTransformType()`.  This can be:  
 `TransformType.NONE, TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE`
 
@@ -144,7 +146,7 @@ If `canvas.Snap` is set to `None` (the default), no snapping will be done.
 If `canvas.RotateSnap` is set to `None` (the default), no rotating will be done.  
 If `canvas.Snap` is set to `None`, the value of `canvas.RotateSnap` has no effect.
 
-###canvas.MouseMode = MouseMode.DRAW
+### canvas.MouseMode = MouseMode.DRAW
 Shapes can be drawn on the canvas by clicking, moving, clicking again...  
 A shape is completed by double-clicking.
 The shape which will be drawn is chosen by setting `canvas.Tool`, which can be:
@@ -152,11 +154,11 @@ The shape which will be drawn is chosen by setting `canvas.Tool`, which can be:
 (NB the bezier shapes will be smooth.)
 The stroke, stroke-width and fill of the shape are determined by the values of by `canvas.PenColour`, `canvas.PenWidth`, and `canvas.FillColour`.
 
-###canvas.MouseMode = MouseMode.EDIT
+### canvas.MouseMode = MouseMode.EDIT
 Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape. (For Bezier shapes there are also "control handles" to control the curvature.) In this mode, `canvas.Tool` will normally be set to `select`.  
 `canvas.SelectedShape` is the shape curently being edited. Use `canvas.DeSelectShape()` to stop editing a shape and hide the handles.
     
-###canvas.MouseMode = MouseMode.NONE
+### canvas.MouseMode = MouseMode.NONE
 No user interaction with the canvas.
 
 
