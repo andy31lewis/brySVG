@@ -56,7 +56,7 @@ The CanvasObject also has various attributes which affect how mouse interaction 
 `linewidth`: Width of the edges in SVG units.  
 `fillcolour`: Colour of the inside of the object.
 
-###PolygonObject, PolyLineObject
+###PolygonObject, PolyLineObject###
 
 `PolygonObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
 `PolylineObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
@@ -64,7 +64,7 @@ Wrappers for SVG polygon and polyline.
 Parameter:  
 `pointlist`: a list of coordinates for the vertices.
 
-###RectangleObject, EllipseObject
+###RectangleObject, EllipseObject###
 
 `RectangleObject(pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow")`  
 Parameters:  
@@ -77,7 +77,7 @@ Parameters:
 `pointlist`: Two diagonally opposite corners of the bounding box of the ellipse.  
 `angle`: The angle (in degrees, clockwise) through which the edges of the bounding box are rotated from horizontal and vertical.
 
-###CircleObject, LineObject
+###CircleObject, LineObject###
 
 `CircleObject(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow")`  
 Parameters:  
@@ -90,7 +90,7 @@ Parameters:
 `pointlist`: the two endpoints of the line.  
 `style`: Either `"solid"`, `"faintdash1"` or `"faintdash2"` (the last two are for use when drawing graph paper).
 
-###Bezier Objects
+###Bezier Objects###
 
 `BezierObject(pointsetlist=[(None, (0,0), (0,0)), ((0,0), (0,0), None)], linecolour="black", linewidth=1, fillcolour=None)`  
 A general Bezier curve. Parameter:  
@@ -111,7 +111,7 @@ A smooth Bezier curve. Parameter:
 A closed smooth Bezier curve (the first vertex does not need to be repeated).  Parameter:
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
-###Common methods for shape objects
+###Common methods for shape objects###
 
 These can be applied to all the shapes above.
 
