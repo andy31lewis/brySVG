@@ -113,6 +113,15 @@ A smooth Bezier curve. Parameter:
 A closed smooth Bezier curve (the first vertex does not need to be repeated).  Parameter:
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
+### Regular polygons
+
+`RegularPolygon(sidecount, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow")`  
+Parameters:  
+`sidecount`: the number of sides.  
+**Either** `centre`: the centre of the polygon, **or** `startpoint`: the coordinates of a vertex at the top of the polygon.  
+**Either** `radius`: the radius of the polygon, **or** `sidelength`: the length of each side.  
+`offsetangle`: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.
+
 ### Common methods for shape objects
 
 These can be applied to all the shapes above.
