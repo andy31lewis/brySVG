@@ -66,6 +66,12 @@ Wrappers for SVG polygon and polyline.
 Parameter:  
 `pointlist`: a list of coordinates for the vertices.
 
+**Methods**  
+`PolygonObjects` have the following extra methods:  
+`area()`: returns the area of the polygon.  
+`isEqual(other)`: returns `True` if `other` is identical, otherwise `False`.  
+`positionRelativeTo(other)`: returns one of `Position.CONTAINS`, `Position.INSIDE`, `Position.OVERLAPS`, `Position.DISJOINT` or `Position.EQUAL`, showing the polygon's position relative to `other`, which is another `PolygonObject`.
+
 ### RectangleObject, EllipseObject
 
 `RectangleObject(pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow")`  
