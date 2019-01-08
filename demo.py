@@ -1,5 +1,4 @@
 from browser import document, html
-import brySVG as SVG
 import brywidgets as ws
 
 class DemoPage(ws.NotebookPage):

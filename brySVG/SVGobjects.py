@@ -23,6 +23,7 @@ class Enum(list):
 
 MouseMode = Enum('MouseMode', 'NONE TRANSFORM DRAW EDIT')
 TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
+Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
 def delete(element):
     element.parentNode.removeChild(element)
@@ -355,6 +356,182 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
     def Update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.PointList])
 
+    def containsPoint(self, point):
+        '''Returns "interior" if point is inside the polygon, "edge" if it is on an edge, or False otherwise'''
+        (x, y) = point
+        length = len(self.PointList)
+        counter = 0
+        (x1, y1) = self.PointList[0]
+        for i in range(1, length+1):
+            (x2, y2) = self.PointList[i%length]
+            if y1 == y2:
+                if y == y1 and min(x1,x2)<=x<=max(x1,x2): return "edge"
+            elif min(y1,y2)<y<=max(y1,y2) and x<max(x1, x2):
+                xcheck = x1 + (y-y1)*(x2-x1)/(y2-y1)
+                if x == xcheck: return "edge"
+                elif x < xcheck:
+                    counter += 1
+            (x1, y1) = (x2, y2)
+        return "interior" if counter%2 == 1 else False
+        
+    def area(self):
+        '''Returns the area of the polygon'''
+        return self._area(self.PointList)
+    
+    def isEqual(self, other):
+        '''Returns True if the polygon is identical to other, False otherwise.
+        other is another PolygonObject'''
+        return self._equalPolys(self.PointList, other.Pointlist)
+    
+    def positionRelativeTo(self, other):
+        '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
+        other is another PolygonObject.'''
+        def getintervals(poly, x):
+            '''Returns the intervals which are the intersection between poly and a vertical
+             line at x, as a list of tuples''' 
+            yvalues = [] #Will contain the y-values of the intersections of the edges of poly and the vertical line at x
+            L = len(poly)
+            i = 0
+            while i < L:
+                (x1, y1) = poly[i]
+                (x2, y2) = poly[(i+1)%L]
+                if (x1 < x and x2 > x) or (x1 > x and x2 < x): #The vertical line intersects this edge,
+                    yvalues.append(y1 + (x-x1)*(y2-y1)/(x2-x1)) #so calculate the intersection point and add it to the list.
+                elif x1 == x and x2 == x: #This edge lies on the vertical line 
+                    edge = sorted((y1, y2))
+                    yvalues.append(edge) # so add the y-values of the edge to the list
+                    (x0, y0) = poly[(i-1)%L]
+                    (x3, y3) = poly[(i+2)%L]
+                    if (x0 < x and x3 < x) or (x0 > x and x3 > x): #The vertical edge is a local extremity,
+                        yvalues.append(edge)                        #so add the y-values a second time.
+                    i += 1
+                    if i == L: del yvalues[0]
+                elif x1 == x: #This vertex lies on the vertical line 
+                    yvalues.append(y1) # so add it to the list
+                    (x0, y0) = poly[(i-1)%L]
+                    if (x0 < x and x2 < x) or (x0 > x and x2 > x): #The vertex is a local extremity,
+                        yvalues.append(y1)                #so add the y-value a second time.
+                i += 1
+                    
+            yvalues.sort(key=lambda x: [x] if not isinstance(x, list) else x)
+            intervals = []
+            for i in range(0, len(yvalues), 2): # There must be an even number of y-values to be grouped in pairs
+                y0 = yvalues[i]
+                if isinstance(y0, list): y0 = y0[0]
+                y1 = yvalues[i+1]
+                if isinstance(y1, list): y1 = y1[1]
+                if i>0 and y0 <= yvalues[i-1]: #If two intervals overlap or are contiguous
+                    intervals[-1] = (intervals[-1][0], y1) #replace them with one combined interval
+                else:
+                    intervals.append((y0, y1))
+            return intervals
+        
+        def compareintervals(intervals1, intervals2):
+            outcome = None # Can be Position.CONTAINS, Position.DISJOINT, Position.OVERLAPS
+            for (start2, end2) in intervals2: #For each "inner?" interval...
+                for (start1, end1) in intervals1: #Check each "outer?" interval
+                    if (start1 == end1 or start2 == end2) and (start1 == start2 or end1 == end2):
+                        break #Zero length inner interval at boundary of outer interval => Indeterminate outcome
+                    if end1 <= start2: 
+                        continue #This "outer?" interval is disjoint, so try the next
+                    if start1 >= end2:
+                        outcome = Position.DISJOINT #This "outer?" interval and all subsequent ones are disjoint
+                        break #Finished with this "inner?" interval
+                    if start1 <= start2 and end1>=end2:
+                        if outcome == Position.DISJOINT: return Position.OVERLAPS #If there is a previous contradictory outcome, we have an overlap
+                        else: outcome = Position.CONTAINS #Otherwise, outer interval contains inner one
+                        break #Either way we have dealt with this "inner?" interval
+                    else: #start1 > start2 or end1 < end2
+                        return Position.OVERLAPS #since part of the "inner?" interval is outside the "outer" interval
+                else: #Looped through all "outer" intervals, with no break or return found
+                    if outcome == Position.CONTAINS: return Position.OVERLAPS #If there is a previous contradictory outcome, we have an overlap
+                    outcome = Position.DISJOINT #Otherwise, "outer?" and "inner?" intervals are disjoint
+            return outcome #Checked all "inner" intervals
+        
+        poly1 = [(round(x,3), round(y,3)) for (x, y) in self.PointList]
+        poly2 = [(round(x,3), round(y,3)) for (x, y) in other.PointList]
+        transposed = False
+        bboxresult = self._compareboundingboxes(poly1, poly2)
+        if bboxresult == Position.DISJOINT: return Position.DISJOINT
+        if bboxresult == Position.EQUAL:
+            if self._equalPolys(poly1, poly2): return Position.EQUAL
+            elif self._area(poly2) > self._area(poly1):
+                poly1, poly2 = poly2, poly1
+                transposed = True
+        if bboxresult == Position.INSIDE:
+            poly1, poly2 = poly2, poly1
+            transposed = True
+            
+        xvalues = sorted(set(x for (x, y) in poly1+poly2))
+        midpoints = [(x1+x2)/2 for (x1, x2) in zip(xvalues, xvalues[1:])]
+        xvalues = sorted(xvalues+midpoints)
+        result = None
+        for i, x in enumerate(xvalues): #Vertical sweepline stops at each vertex of either polygon
+            intervals1 = getintervals(poly1, x)
+            intervals2 = getintervals(poly2, x)
+            newresult = compareintervals(intervals1, intervals2)
+            if newresult == Position.OVERLAPS: return newresult
+            if newresult is None or newresult == result: continue
+            if result is None:
+                result = newresult
+            else:
+                return Position.OVERLAPS
+        if result == Position.CONTAINS and transposed: result = Position.INSIDE
+        return result
+
+    @staticmethod
+    def _compareboundingboxes(poly1, poly2):
+        def getboundingbox(poly):
+            xcoords = [x for (x,y) in poly]
+            left = min(xcoords)
+            right = max(xcoords)
+            ycoords = [y for (x,y) in poly]
+            top = min(ycoords)
+            bottom = max(ycoords)
+            return (left, top), (right, bottom)
+    
+        ((left1, top1), (right1, bottom1)) = getboundingbox(poly1)
+        ((left2, top2), (right2, bottom2)) = getboundingbox(poly2)
+        if right1 <= left2 or right2 <= left1 or bottom1 <= top2 or bottom2 <= top1: return Position.DISJOINT
+        if left1 < left2:
+            if right1 < right2: return Position.OVERLAPS
+            else: xresult = Position.CONTAINS
+        elif left1 == left2:
+            xresult = Position.INSIDE if right1 < right2 else Position.EQUAL if right1 == right2 else Position.CONTAINS
+        else: #left1 > left2
+            if right1 > right2: return Position.OVERLAPS
+            else: xresult = Position.INSIDE
+
+        if top1 < top2:
+            if bottom1 < bottom2: return Position.OVERLAPS
+            else: return Position.OVERLAPS if xresult == Position.INSIDE else Position.CONTAINS
+        elif top1 == top2:
+            if bottom1 < bottom2: return Position.OVERLAPS if xresult == Position.CONTAINS else Position.INSIDE
+            elif bottom1 == bottom2: return xresult
+            else: return Position.OVERLAPS if xresult == Position.INSIDE else Position.CONTAINS
+        else: #top1 > top2
+            if bottom1 > bottom2: return Position.OVERLAPS
+            else: return Position.OVERLAPS if xresult == Position.CONTAINS else Position.INSIDE
+        
+    @staticmethod
+    def _area(poly):  
+        area = 0
+        (x0, y0) = poly[-1]
+        for (x1, y1) in poly:
+            area += x1*y0 - x0*y1
+            (x0, y0) = (x1, y1)
+        return abs(area/2)
+    
+    @staticmethod
+    def _equalPolys(poly1, poly2):
+        '''Returns True if poly1 is identical to poly2, False otherwise.
+        poly1 and poly2 are lists of vertex coordinates.'''
+        start1 = poly1.index(min(poly1))
+        poly1 =  poly1[start1+1:]+poly1[:start1]
+        start2 = poly2.index(min(poly2))
+        poly2 =  poly2[start2+1:]+poly2[:start2]
+        return poly1 == poly2 or poly1 == poly2[::-1]
+
 class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
     '''Wrapper for SVG rect.  Parameters:
     pointlist: a list of coordinates for two opposite vertices
@@ -664,7 +841,7 @@ class CanvasObject(svg.svg):
         SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
         return Point((SVGpt.x, SVGpt.y))
 
-    def AddObject(self, svgobject):
+    def AddObject(self, svgobject, fixed=False):
         '''Adds an object to the canvas, and also adds it to the canvas's ObjectDict so that it can be referenced
         using canvas.ObjectDict[id]. This is also needed for the object to be capable of being snapped to.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
@@ -678,6 +855,7 @@ class CanvasObject(svg.svg):
         self <= svgobject
         AddToDict(svgobject)
         svgobject.Canvas = self
+        svgobject.Fixed = fixed
         return svgobject
     
     def ClearAll(self):
@@ -727,11 +905,11 @@ class CanvasObject(svg.svg):
 
     def onLeftDown(self, event):
         if event.button > 0: return
-        if self.MouseMode is MouseMode.TRANSFORM:
-            if self.MouseTransformType is TransformType.NONE or event.target.id not in self.ObjectDict: return
+        if self.MouseMode == MouseMode.TRANSFORM:
+            if self.MouseTransformType == TransformType.NONE or event.target.id not in self.ObjectDict: return
             self.prepareMouseTransform(event)
 
-        elif self.MouseMode is MouseMode.DRAW:
+        elif self.MouseMode == MouseMode.DRAW:
             if self.MouseOwner:
                 if self.MouseOwner.ShapeType in ("polygon", "polyline", "bezier", "closedbezier"):
                     coords = self.getSVGcoords(event)
@@ -740,7 +918,7 @@ class CanvasObject(svg.svg):
                 coords = self.getSVGcoords(event)
                 self.createObject(coords)
 
-        elif self.MouseMode is MouseMode.EDIT:
+        elif self.MouseMode == MouseMode.EDIT:
             if event.target.id in self.ObjectDict:
                 self.ObjectDict[event.target.id].SelectShape()
             else:
@@ -748,8 +926,8 @@ class CanvasObject(svg.svg):
                     self.DeSelectShape()
 
     def onMouseMove(self, event):
-        if self.MouseMode is MouseMode.TRANSFORM:
-            if not self.MouseOwner or self.MouseTransformType is TransformType.NONE: return
+        if self.MouseMode == MouseMode.TRANSFORM:
+            if not self.MouseOwner or self.MouseTransformType == TransformType.NONE: return
             self.doMouseTransform(event)
         else:
             if self.MouseOwner:
@@ -758,10 +936,10 @@ class CanvasObject(svg.svg):
 
     def onLeftUp(self, event):
         if event.button > 0: return
-        if self.MouseMode is MouseMode.TRANSFORM:
-            if self.MouseTransformType is TransformType.NONE: return
+        if self.MouseMode == MouseMode.TRANSFORM:
+            if self.MouseTransformType == TransformType.NONE: return
             self.endMouseTransform(event)
-        elif self.MouseMode is MouseMode.EDIT:
+        elif self.MouseMode == MouseMode.EDIT:
             try:
                 self.MouseOwner.onLeftUp()
             except AttributeError:
@@ -770,7 +948,7 @@ class CanvasObject(svg.svg):
             self.MouseOwner = None
 
     def onDoubleClick(self,event):
-        if event.button > 0 or self.MouseMode is not MouseMode.DRAW: return
+        if event.button > 0 or self.MouseMode != MouseMode.DRAW: return
         if self.MouseOwner:
             if self.Tool in ["polygon", "polyline", "bezier", "closedbezier"]:
                 self.MouseOwner.DeletePoints(-2, None)
@@ -784,6 +962,7 @@ class CanvasObject(svg.svg):
 
     def prepareMouseTransform(self, event):
         svgobj = self.ObjectDict[event.target.id]
+        if svgobj.Fixed: return
         while getattr(svgobj, "Group", None):
             svgobj = svgobj.Group
         self <= svgobj
@@ -794,9 +973,9 @@ class CanvasObject(svg.svg):
         if self.MouseTransformType in [TransformType.NONE, TransformType.TRANSLATE]: return
         if self.MouseTransformType in [TransformType.ROTATE, TransformType.ENLARGE]:
             self.TransformOrigin = PointObject(self.MouseOwnerCentre, colour="blue", pointsize=3)
-        elif self.MouseTransformType is TransformType.XSTRETCH:
+        elif self.MouseTransformType == TransformType.XSTRETCH:
             self.TransformOrigin = LineObject([(cx, bbox.y), (cx, bbox.y+bbox.height)], linecolour="blue", linewidth=2)
-        elif self.MouseTransformType is TransformType.YSTRETCH:
+        elif self.MouseTransformType == TransformType.YSTRETCH:
             self.TransformOrigin = LineObject([(bbox.x, cy), (bbox.x+bbox.width, cy)], linecolour="blue", linewidth=2)
         self <= self.TransformOrigin
 
@@ -808,15 +987,15 @@ class CanvasObject(svg.svg):
         vec1 = (x1, y1) = self.StartPoint - self.MouseOwnerCentre
         vec2 = (x2, y2) = currentcoords - self.MouseOwnerCentre
         self.StartPoint = currentcoords
-        if self.MouseTransformType is TransformType.TRANSLATE:
+        if self.MouseTransformType == TransformType.TRANSLATE:
             self.MouseOwner.translate(offset)
-        elif self.MouseTransformType is TransformType.ROTATE:
+        elif self.MouseTransformType == TransformType.ROTATE:
             self.MouseOwner.rotateByVectors(vec1, vec2, (cx, cy))
-        elif self.MouseTransformType is TransformType.XSTRETCH:
+        elif self.MouseTransformType == TransformType.XSTRETCH:
             self.MouseOwner.xstretch(x2/x1, cx)
-        elif self.MouseTransformType is TransformType.YSTRETCH:
+        elif self.MouseTransformType == TransformType.YSTRETCH:
             self.MouseOwner.ystretch(y2/y1, cy)
-        elif self.MouseTransformType is TransformType.ENLARGE:
+        elif self.MouseTransformType == TransformType.ENLARGE:
             self.MouseOwner.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
 
     def endMouseTransform(self, event):
