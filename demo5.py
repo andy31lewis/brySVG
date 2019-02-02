@@ -15,4 +15,3 @@ canvas.MouseMode = SVG.MouseMode.DRAW
 canvas.Tool = next(toolcycle)
 canvas.style.cursor = "url(brySVG/draw{}.png), auto".format(canvas.Tool)
 canvas.bind("contextmenu", onRightClick)
-

@@ -60,7 +60,7 @@ class TransformMixin(object):
         (pt.x, pt.y) = self.XY
         pt =  pt.matrixTransform(matrix)
         return Point((pt.x, pt.y))
-        
+
     def transformedPointList(self, matrix):
         '''Not intended to be called by end users.'''
         pt = svgbase.createSVGPoint()
@@ -70,7 +70,7 @@ class TransformMixin(object):
             pt =  pt.matrixTransform(matrix)
             newpointlist.append(Point((pt.x, pt.y)))
         return newpointlist
-        
+
     def transformedPointsetList(self, matrix):
         '''Not intended to be called by end users.'''
         pt = svgbase.createSVGPoint()
@@ -96,7 +96,7 @@ class TransformMixin(object):
         else:
             self.PointList = self.transformedPointList(matrix)
         self.Update()
-            
+
     def translate(self, vector):
         '''Translate object by vector'''
         if isinstance(self, GroupObject):
@@ -106,11 +106,11 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setTranslate(*vector)
             self.matrixTransform(t.matrix)
-    
+
     def rotate(self, angle, centre=None):
         '''Rotate object clockwise by angle degrees around centre.
         If centre is not given, it is the centre of the object's bounding box.'''
-        if not centre: 
+        if not centre:
             bbox = self.getBBox()
             centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
         if isinstance(self, GroupObject):
@@ -296,7 +296,7 @@ class SmoothBezierMixin(object):
 class LineObject(svg.line, TransformMixin, NonBezierMixin):
     def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None):
         [(x1, y1), (x2, y2)] = pointlist
-                
+
         if style == "faintdash1":
             dasharray = "10,5"
             linecolour = "grey"
@@ -315,9 +315,9 @@ class LineObject(svg.line, TransformMixin, NonBezierMixin):
         self.attrs["y1"] = y1
         self.attrs["x2"] = x2
         self.attrs["y2"] = y2
-        
+
 class TextObject(svg.text):
-    def __init__(self, string, point, anchorpos=1, style="normal"):
+    def __init__(self, string, point, anchorpos=1, fontsize=12, style="normal"):
         (x, y) = point
         if anchorpos in [3, 4, 5]:
             horizpos = "end"
@@ -332,7 +332,7 @@ class TextObject(svg.text):
         else:
             yoffset = "12pt"
 
-        svg.text.__init__(self, string, x=x, y=y, font_size=12, dy=yoffset, text_anchor=horizpos)
+        svg.text.__init__(self, string, x=x, y=y, font_size=fontsize, dy=yoffset, text_anchor=horizpos)
 
 class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixin):
     '''Wrapper for SVG polyline. Parameter:
@@ -373,22 +373,32 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
                     counter += 1
             (x1, y1) = (x2, y2)
         return "interior" if counter%2 == 1 else False
-        
+
     def area(self):
         '''Returns the area of the polygon'''
         return self._area(self.PointList)
-    
+
     def isEqual(self, other):
         '''Returns True if the polygon is identical to other, False otherwise.
         other is another PolygonObject'''
         return self._equalPolys(self.PointList, other.Pointlist)
-    
-    def positionRelativeTo(self, other):
+
+    def getBoundingBox(self):
+        return self._getboundingbox(self.PointList)
+
+    def positionRelativeTo(self, other, dp=1):
         '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
         other is another PolygonObject.'''
+        ABOVE, BELOW, CONTAINS, ABOVEORCONTAINS, BELOWORCONTAINS = 0, 1, 2, 3, 4
+        ENDING, ONGOING, STARTING = 0, 1, 2
+        START, END = 0, 1
+
+        def makeregion(ID, bounds, status):
+            return {"ID":ID, "bounds":bounds, "status":status, "position":{}}
+
         def getintervals(poly, x):
             '''Returns the intervals which are the intersection between poly and a vertical
-             line at x, as a list of tuples''' 
+             line at x, as a list of tuples'''
             yvalues = [] #Will contain the y-values of the intersections of the edges of poly and the vertical line at x
             L = len(poly)
             i = 0
@@ -396,61 +406,184 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
                 (x1, y1) = poly[i]
                 (x2, y2) = poly[(i+1)%L]
                 if (x1 < x and x2 > x) or (x1 > x and x2 < x): #The vertical line intersects this edge,
-                    yvalues.append(y1 + (x-x1)*(y2-y1)/(x2-x1)) #so calculate the intersection point and add it to the list.
-                elif x1 == x and x2 == x: #This edge lies on the vertical line 
-                    edge = sorted((y1, y2))
-                    yvalues.append(edge) # so add the y-values of the edge to the list
+                    yvalues.append((round(y1 + (x-x1)*(y2-y1)/(x2-x1), dp), "N")) #so calculate the intersection point and add it to the list.
+                elif x1 == x and x2 == x: #This edge lies on the vertical line
                     (x0, y0) = poly[(i-1)%L]
                     (x3, y3) = poly[(i+2)%L]
-                    if (x0 < x and x3 < x) or (x0 > x and x3 > x): #The vertical edge is a local extremity,
-                        yvalues.append(edge)                        #so add the y-values a second time.
+                    t1 = "L" if x0<x else "R"
+                    t2 = "L" if x3<x else "R"
+                    if t1 == t2:
+                        yvalues.extend([(round(y1, dp), t1), (round(y2, dp), t2)])
+                    else:
+                        yvalues.append(([round(y1, dp), round(y2, dp)], t1+t2))
                     i += 1
                     if i == L: del yvalues[0]
-                elif x1 == x: #This vertex lies on the vertical line 
-                    yvalues.append(y1) # so add it to the list
+                elif x1 == x: #This vertex lies on the vertical line
+                    vertex = round(y1, dp)
                     (x0, y0) = poly[(i-1)%L]
-                    if (x0 < x and x2 < x) or (x0 > x and x2 > x): #The vertex is a local extremity,
-                        yvalues.append(y1)                #so add the y-value a second time.
+                    t = "L" if (x0 < x and x2 < x) else "R" if (x0 > x and x2 > x) else "N"
+                    yvalues.append((vertex, t)) # so add it to the list
+                    if t in ["L", "R"]: #The vertex is a local extremity,
+                        yvalues.append((vertex, t))  #so add the y-value a second time.
                 i += 1
-                    
-            yvalues.sort(key=lambda x: [x] if not isinstance(x, list) else x)
+
+            yvalues.sort(key=lambda x: [x[0]] if not isinstance(x[0], list) else x[0])
             intervals = []
             for i in range(0, len(yvalues), 2): # There must be an even number of y-values to be grouped in pairs
                 y0 = yvalues[i]
-                if isinstance(y0, list): y0 = y0[0]
                 y1 = yvalues[i+1]
-                if isinstance(y1, list): y1 = y1[1]
-                if i>0 and y0 <= yvalues[i-1]: #If two intervals overlap or are contiguous
-                    intervals[-1] = (intervals[-1][0], y1) #replace them with one combined interval
+                if isinstance(y0, list):
+                    if not (i>0 and y0==intervals[-1]): intervals.append(y0)
+                    if isinstance(y1, list):
+                        if y1 != y0: intervals.append(y1)
+                    else:
+                        intervals.append((y0[1], y1))
+                elif isinstance(y1, list):
+                    intervals.extend([(y0, y1[0]), y1])
                 else:
                     intervals.append((y0, y1))
             return intervals
-        
-        def compareintervals(intervals1, intervals2):
-            outcome = None # Can be Position.CONTAINS, Position.DISJOINT, Position.OVERLAPS
-            for (start2, end2) in intervals2: #For each "inner?" interval...
-                for (start1, end1) in intervals1: #Check each "outer?" interval
-                    if (start1 == end1 or start2 == end2) and (start1 == start2 or end1 == end2):
-                        break #Zero length inner interval at boundary of outer interval => Indeterminate outcome
-                    if end1 <= start2: 
-                        continue #This "outer?" interval is disjoint, so try the next
-                    if start1 >= end2:
-                        outcome = Position.DISJOINT #This "outer?" interval and all subsequent ones are disjoint
-                        break #Finished with this "inner?" interval
-                    if start1 <= start2 and end1>=end2:
-                        if outcome == Position.DISJOINT: return Position.OVERLAPS #If there is a previous contradictory outcome, we have an overlap
-                        else: outcome = Position.CONTAINS #Otherwise, outer interval contains inner one
-                        break #Either way we have dealt with this "inner?" interval
-                    else: #start1 > start2 or end1 < end2
-                        return Position.OVERLAPS #since part of the "inner?" interval is outside the "outer" interval
-                else: #Looped through all "outer" intervals, with no break or return found
-                    if outcome == Position.CONTAINS: return Position.OVERLAPS #If there is a previous contradictory outcome, we have an overlap
-                    outcome = Position.DISJOINT #Otherwise, "outer?" and "inner?" intervals are disjoint
-            return outcome #Checked all "inner" intervals
-        
-        poly1 = [(round(x,3), round(y,3)) for (x, y) in self.PointList]
-        poly2 = [(round(x,3), round(y,3)) for (x, y) in other.PointList]
+
+        def getregions(intervals, rlist, nextrlabel):
+            #nonlocal nextrlabel
+            rlist = [region for region in rlist if region["status"] != ENDING]
+            rcount = len(rlist)
+            rindex = 0
+            newrlist = []
+            for (y1, t1), (y2, t2) in intervals:
+                startregion = False
+                oldy1 = y1[0] if t1=="LR" else y1[1] if t1=="RL" else y1
+                newy1 = y1[0] if t1=="RL" else y1[1] if t1=="LR" else y1
+                oldy2 = y2[0] if t2=="LR" else y2[1] if t2=="RL" else y2
+                newy2 = y2[0] if t2=="RL" else y2[1] if t2=="LR" else y2
+                if t1=="R" and t2=="R" and (rindex>=rcount or newy2 < rlist[rindex]["bounds"][START]):
+                    startregion = True
+                    rlist.append(makeregion(chr(nextrlabel), [newy1, newy2], STARTING))
+                    nextrlabel += 1
+                elif t1=="L" and t2=="L":
+                    rlist[rindex]["bounds"] = [oldy1, oldy2]
+                    rlist[rindex]["status"] = ENDING
+                elif t1=="N":
+                    rlist[rindex]["bounds"][START] = oldy1
+                    if rlist[rindex]["status"]==STARTING: rlist[rindex]["status"] = ONGOING
+                elif t1 in ["RL", "LR"]:
+                    rlist[rindex]["bounds"][START] = oldy1
+                    rlist[rindex]["status"] = ENDING
+                    newrlist.append(makeregion(chr(nextrlabel), [newy1, None], STARTING))
+                    nextrlabel += 1
+                elif t1=="R":
+                    newrlist.append(makeregion(chr(nextrlabel), [newy1, None], STARTING))
+                    nextrlabel += 1
+                elif t1=="L":
+                    rlist[rindex]["bounds"][START] = oldy1
+                    rlist[rindex]["status"] = ENDING
+                if t2=="N":
+                    rlist[rindex]["bounds"][END] = oldy2
+                    if rlist[rindex]["status"] == STARTING: rlist[rindex]["status"] = ONGOING
+                    if newrlist: newrlist[-1]["bounds"][END] = newy2
+
+                elif t2 in ["RL", "LR"]:
+                    rlist[rindex]["bounds"][END] = oldy2
+                    rlist[rindex]["status"] = ENDING
+                    if newrlist:
+                        newrlist[-1]["bounds"][END] = newy2
+                    else:
+                        newrlist.append(makeregion(chr(nextrlabel), [newy1, newy2], STARTING))
+                        nextrlabel += 1
+                elif t2=="R" and not startregion:
+                    rlist[rindex]["status"] = ENDING
+                    if not newrlist:
+                        newrlist.append(makeregion(chr(nextrlabel), [newy1, newy2], STARTING))
+                        nextrlabel += 1
+                    else:
+                        newrlist[-1]["bounds"][END] = newy2
+                elif t2=="L" and t1!="L":
+                    rlist[rindex]["bounds"][END] = oldy2
+                    rlist[rindex]["status"] = ENDING
+                    if not newrlist:
+                        newrlist.append(makeregion(chr(nextrlabel), [newy1, None], STARTING))
+                        nextrlabel += 1
+
+                if t2 != "R": rindex += 1
+                if t2 != "L":
+                    if newrlist:
+                        rlist.extend(newrlist)
+                        newrlist = []
+
+            rlist.sort(key=lambda x: x["bounds"])
+            return rlist, nextrlabel
+
+        def compareintervals(currentoutcome, rlist1, rlist2):
+            for inner in rlist2: #For each "inner?" interval
+                if not rlist1:
+                    if currentoutcome == Position.CONTAINS: return Position.OVERLAPS
+                    currentoutcome = Position.DISJOINT
+
+                (start2, end2) = inner["bounds"]
+                alldisjoint = True
+                for outer in rlist1: #Check each "outer?" interval
+                    if (inner["status"], outer["status"]) in [(STARTING, ENDING), (ENDING, STARTING)]: continue
+                    (start1, end1) = outer["bounds"]
+                    try:
+                        position = inner["position"][outer["ID"]]
+                        if position == ABOVE and end1 > start2: return Position.OVERLAPS
+                        elif position == BELOW and start1 < end2: return Position.OVERLAPS
+                        elif position == CONTAINS:
+                            if (start1 > start2 or end1 < end2): return Position.OVERLAPS
+                            if outer["status"] == ENDING and inner["status"] != ENDING: continue
+                            alldisjoint = False
+                        elif position == ABOVEORCONTAINS:
+                            if end1 <= start2:
+                                if currentoutcome == Position.CONTAINS: return Position.OVERLAPS
+                                inner["position"][outer["ID"]] = ABOVE
+                            elif start1 <= start2 and end1 >= end2:
+                                if currentoutcome == Position.DISJOINT: return Position.OVERLAPS
+                                inner["position"][outer["ID"]] = CONTAINS
+                                alldisjoint = False
+                                currentoutcome = Position.CONTAINS
+                            else: return Position.OVERLAPS
+                        elif position == BELOWORCONTAINS:
+                            if start1 >= end2:
+                                if currentoutcome == Position.CONTAINS: return Position.OVERLAPS
+                                inner["position"][outer["ID"]] = BELOW
+                            elif start1 <= start2 and end1 >= end2:
+                                if currentoutcome == Position.DISJOINT: return Position.OVERLAPS
+                                inner["position"][outer["ID"]] = CONTAINS
+                                alldisjoint = False
+                                currentoutcome = Position.CONTAINS
+                            else: return Position.OVERLAPS
+
+                    except KeyError:
+                        if start2 == end2 == start1 == end1:
+                            alldisjoint = False
+                        elif start2 == end2 == end1:
+                            inner["position"][outer["ID"]] = ABOVEORCONTAINS
+                            alldisjoint = False
+                        elif start2 == end2 == start1:
+                            inner["position"][outer["ID"]] = BELOWORCONTAINS
+                            alldisjoint = False
+                        elif end1 <= start2:
+                            inner["position"][outer["ID"]] = ABOVE
+                        elif start1 >= end2:
+                            inner["position"][outer["ID"]] = BELOW
+                        elif start1 <= start2 and end1>=end2:
+                            if currentoutcome == Position.DISJOINT: return Position.OVERLAPS #If there is a previous contradictory outcome, we have an overlap
+                            inner["position"][outer["ID"]] = CONTAINS
+                            currentoutcome = Position.CONTAINS #Otherwise, outer interval contains inner one
+                            if outer["status"] == ENDING and inner["status"] != ENDING: continue
+                            alldisjoint = False
+                        else: #start1 < end2 and end1 > start2 and (start1 > start2 or end1 < end2)
+                            return Position.OVERLAPS #since part of the "inner?" interval is outside the "outer" interval
+                if alldisjoint:
+                    if currentoutcome == Position.CONTAINS: return Position.OVERLAPS
+                    currentoutcome = Position.DISJOINT
+            return currentoutcome #Checked all "inner" intervals
+
+        dp1 = dp+2
+        poly1 = [(round(x,dp1), round(y,dp1)) for (x, y) in self.PointList]
+        poly2 = [(round(x,dp1), round(y,dp1)) for (x, y) in other.PointList]
         transposed = False
+
         bboxresult = self._compareboundingboxes(poly1, poly2)
         if bboxresult == Position.DISJOINT: return Position.DISJOINT
         if bboxresult == Position.EQUAL:
@@ -461,37 +594,43 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
         if bboxresult == Position.INSIDE:
             poly1, poly2 = poly2, poly1
             transposed = True
-            
+
         xvalues = sorted(set(x for (x, y) in poly1+poly2))
-        midpoints = [(x1+x2)/2 for (x1, x2) in zip(xvalues, xvalues[1:])]
-        xvalues = sorted(xvalues+midpoints)
-        result = None
+        rlist1 = []
+        rlist2 = []
+        rdict = {}
+        nextrlabel1 = 65
+        nextrlabel2 = 97
+        currentoutcome = None
         for i, x in enumerate(xvalues): #Vertical sweepline stops at each vertex of either polygon
             intervals1 = getintervals(poly1, x)
+            #print (x)
+            rlist1, nextrlabel1 = getregions(intervals1, rlist1, nextrlabel1)
+            #print (rlist1)
             intervals2 = getintervals(poly2, x)
-            newresult = compareintervals(intervals1, intervals2)
-            if newresult == Position.OVERLAPS: return newresult
-            if newresult is None or newresult == result: continue
-            if result is None:
-                result = newresult
-            else:
-                return Position.OVERLAPS
-        if result == Position.CONTAINS and transposed: result = Position.INSIDE
-        return result
+            rlist2, nextrlabel2 = getregions(intervals2, rlist2, nextrlabel2)
+            #print (rlist2)
+
+            currentoutcome = compareintervals(currentoutcome, rlist1, rlist2)
+            #print ("currentoutcome", currentoutcome, "\n")
+            if currentoutcome == Position.OVERLAPS: return currentoutcome
+        if currentoutcome == Position.CONTAINS and transposed: currentoutcome = Position.INSIDE
+        return currentoutcome
+
+    @staticmethod
+    def _getboundingbox(poly):
+        xcoords = [x for (x,y) in poly]
+        left = min(xcoords)
+        right = max(xcoords)
+        ycoords = [y for (x,y) in poly]
+        top = min(ycoords)
+        bottom = max(ycoords)
+        return (left, top), (right, bottom)
 
     @staticmethod
     def _compareboundingboxes(poly1, poly2):
-        def getboundingbox(poly):
-            xcoords = [x for (x,y) in poly]
-            left = min(xcoords)
-            right = max(xcoords)
-            ycoords = [y for (x,y) in poly]
-            top = min(ycoords)
-            bottom = max(ycoords)
-            return (left, top), (right, bottom)
-    
-        ((left1, top1), (right1, bottom1)) = getboundingbox(poly1)
-        ((left2, top2), (right2, bottom2)) = getboundingbox(poly2)
+        ((left1, top1), (right1, bottom1)) = PolygonObject._getboundingbox(poly1)
+        ((left2, top2), (right2, bottom2)) = PolygonObject._getboundingbox(poly2)
         if right1 <= left2 or right2 <= left1 or bottom1 <= top2 or bottom2 <= top1: return Position.DISJOINT
         if left1 < left2:
             if right1 < right2: return Position.OVERLAPS
@@ -512,16 +651,16 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
         else: #top1 > top2
             if bottom1 > bottom2: return Position.OVERLAPS
             else: return Position.OVERLAPS if xresult == Position.CONTAINS else Position.INSIDE
-        
+
     @staticmethod
-    def _area(poly):  
+    def _area(poly):
         area = 0
         (x0, y0) = poly[-1]
         for (x1, y1) in poly:
             area += x1*y0 - x0*y1
             (x0, y0) = (x1, y1)
         return abs(area/2)
-    
+
     @staticmethod
     def _equalPolys(poly1, poly2):
         '''Returns True if poly1 is identical to poly2, False otherwise.
@@ -548,14 +687,14 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
-        
+
         basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["x"] = x2 if x2<x1 else x1
         self.attrs["y"] = y2 if y2<y1 else y1
         self.attrs["width"] = abs(x2-x1)
         self.attrs["height"] = abs(y2-y1)
-        
+
 class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
     '''Wrapper for SVG ellipse.  Parameters:
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
@@ -565,14 +704,14 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
         self.PointList = [Point(coords) for coords in pointlist]
         self.angle = angle
         self.Update()
-    
+
     def Update(self):
         [(x1, y1), (x2, y2)] = self.PointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
-        
+
         basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["cx"]=(x1+x2)/2
@@ -635,12 +774,12 @@ class ClosedBezierObject(svg.path, BezierMixin, TransformMixin):
 class SmoothBezierObject(SmoothBezierMixin, BezierObject):
     '''Wrapper for svg path element.  Parameter:
     pointlist: a list of vertices.
-    Control points will be calculated automatically so that the curve is smooth at each vertex.''' 
+    Control points will be calculated automatically so that the curve is smooth at each vertex.'''
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
         self.PointList = [Point(coords) for coords in pointlist]
         pointsetlist = self.getpointsetlist(self.PointList)
         BezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
-            
+
     def getpointsetlist(self, pointlist):
         if len(pointlist) == 2: return[[None]+pointlist, pointlist+[None]]
         for i in range(1, len(pointlist)-1):
@@ -659,12 +798,12 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
     '''Wrapper for svg path element.  Parameter:
     pointlist: a list of vertices.
     The path will be closed (the first vertex does not need to be repeated).
-    Control points will be calculated automatically so that the curve is smooth at each vertex.''' 
+    Control points will be calculated automatically so that the curve is smooth at each vertex.'''
     def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         self.PointList = [Point(coords) for coords in pointlist]
         pointsetlist = self.getpointsetlist(self.PointList)
         ClosedBezierObject.__init__(self, pointsetlist, linecolour, linewidth, fillcolour)
-            
+
     def getpointsetlist(self, pointlist):
         pointlist = [pointlist[-1]]+pointlist[:]+[pointlist[0]]
         pointsetlist = []
@@ -702,12 +841,12 @@ class RegularPolygon(PolygonObject):
     EITHER centre: the centre of the polygon, OR startpoint: the coordinates of a vertex at the top of the polygon
     EITHER radius: the radius of the polygon, OR sidelength: the length of each side
     offsetangle: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.'''
-    
+
     def __init__(self, sidecount, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
         angle = 2*pi/sidecount
         radoffset = offsetangle*pi/180
         if not radius: radius = sidelength/(2*sin(pi/sidecount))
-        if not centre: 
+        if not centre:
             (x, y) = startpoint
             centre = (x-radius*sin(radoffset), y+radius*cos(radoffset))
         (cx, cy) = centre
@@ -721,9 +860,9 @@ class GroupObject(svg.g, TransformMixin):
     '''Wrapper for SVG g element. Parameters:
     objlist: list of the objects to include in the group
     id: (optional) id to indetify the element in the DOM'''
-    def __init__(self, objlist=[], id=None):
+    def __init__(self, objlist=[], objid=None):
         svg.g.__init__(self)
-        if id: self.attrs["id"] = id
+        if objid: self.attrs["id"] = objid
         if not isinstance(objlist, list): objlist = [objlist]
         self.ObjectList = []
         for obj in objlist:
@@ -757,9 +896,9 @@ class CanvasObject(svg.svg):
                     (to set the SVG attributes which are in pixels, call canvas.setDimensions() after creating the object.)
     colour: the background colour
     id: the DOM id
-    
+
     After creation, there are various attributes which control how the canvas responds to mouse actions:
-    
+
     canvas.MouseMode = MouseMode.TRANSFORM
         Clicking on an object and dragging carries out the transformation
         which has been set using canvas.setMouseTransformType().  This can be:
@@ -780,7 +919,7 @@ class CanvasObject(svg.svg):
         line, polygon, polyline, rectangle, ellipse, circle, bezier, closedbezier
         (NB the bezier shapes will be smooth.)
         The stroke, stroke-width and fill of the shape are set by canvas.PenColour, canvas.PenWidth, and canvas.FillColour
-    
+
     canvas.MouseMode = MouseMode.EDIT
         Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape.
         (For Bezier shapes there are also "control handles" to control the curvature.)
@@ -788,12 +927,12 @@ class CanvasObject(svg.svg):
         While a shape is selected, pressing the DEL key on the keyboard will delete the shape.
         canvas.SelectedShape is the shape curently being edited.
         Use canvas.DeSelectShape to stop editing a shape and hide the handles.
-    
+
     canvas.MouseMode = MouseMode.NONE
         No user interaction with the canvas.
     '''
-        
-        
+
+
     def __init__(self, width, height, colour="white", id=None):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
         if id: self.id = id
@@ -841,7 +980,7 @@ class CanvasObject(svg.svg):
         SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
         return Point((SVGpt.x, SVGpt.y))
 
-    def AddObject(self, svgobject, fixed=False):
+    def AddObject(self, svgobject, objid=None, fixed=False):
         '''Adds an object to the canvas, and also adds it to the canvas's ObjectDict so that it can be referenced
         using canvas.ObjectDict[id]. This is also needed for the object to be capable of being snapped to.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
@@ -852,12 +991,13 @@ class CanvasObject(svg.svg):
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.ObjectList:
                     AddToDict(obj)
+        if objid: svgobject.id = objid
         self <= svgobject
         AddToDict(svgobject)
         svgobject.Canvas = self
         svgobject.Fixed = fixed
         return svgobject
-    
+
     def ClearAll(self):
         '''Clear all elements from the canvas'''
         while self.firstChild:
@@ -868,7 +1008,7 @@ class CanvasObject(svg.svg):
         '''Rotate an element clockwise by angle degrees around centre.
         If centre is not given, it is the centre of the object's bounding box.'''
 
-        if not centre: 
+        if not centre:
             bbox = element.getBBox()
             centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
         t = svgbase.createSVGTransform()
@@ -1167,7 +1307,7 @@ class Point(object):
         if isinstance(other, (int, float)):
             return Point([other*xi for xi in self.coords])
         elif isinstance(other, (list, tuple)):
-            return Point([xi*yi for (xi, yi) in zip(self.coords, other)]) 
+            return Point([xi*yi for (xi, yi) in zip(self.coords, other)])
         elif isinstance(other, Point):
             return sum([xi*yi for (xi, yi) in zip(self.coords, other.coords)])
         elif isinstance(other, Matrix):
@@ -1179,9 +1319,9 @@ class Point(object):
         if isinstance(other, (int, float)):
             return Point([other*xi for xi in self.coords])
         elif isinstance(other, (list, tuple)):
-           return Point([xi*yi for (xi, yi) in zip(self.coords, other)]) 
+           return Point([xi*yi for (xi, yi) in zip(self.coords, other)])
         elif isinstance(other, Point):
-            return sum([xi*yi for (xi, yi) in zip(self.coords, other.coords)])            
+            return sum([xi*yi for (xi, yi) in zip(self.coords, other.coords)])
         else:
             return NotImplemented
 
@@ -1190,7 +1330,7 @@ class Point(object):
 
     def __getitem__(self, i):
         return self.coords[i]
-    
+
     def __len__(self):
         return len(self.coords)
 
