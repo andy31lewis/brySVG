@@ -34,17 +34,17 @@ html.P(html.B("Demo 4")+""" - This demonstrates canvas.RotateSnap, and also how 
 Drag the polygons around, matching edges as closely as possible. If the angle between the edges is not too great,
 the dragged polygon should rotate so that the edges coincide.
 Right-clicking on the canvas will toggle between dragging and rotating."""),
-html.P(html.B("Demo 5")+""" - This demostrates MouseMode.DRAW. Click, then move to start drawing a shape.
+html.P(html.B("Demo 5")+""" - This demonstrates MouseMode.DRAW. Click, then move to start drawing a shape.
 Click again to create a new vertex. Double-click to finish the shape."""+html.BR()+
-"""Right-clicking will cycle between different types of shape:"""+html.BR()+
-"""polygon, polyline, rectangle, ellipse, circle, (smooth) bezier, and (smooth) closedbezier"""),
-html.P(html.B("Demo 6")+""" - This demostrates MouseMode.EDIT. Clicking on a shape will display some handles,
+"""Right-clicking will cycle between different types of shape:
+polygon, polyline, rectangle, ellipse, circle, (smooth) bezier, and (smooth) closedbezier"""),
+html.P(html.B("Demo 6")+""" - This demonstrates MouseMode.EDIT. Clicking on a shape will display some handles,
 which can be dragged to change the shape. Bezier shapes also have (green) control handles which change the curvature
 at a vertex. For a smooth Bezier shape, these will move as a pair."""),
-html.P(html.B("Demo 7")+""" - This demostrates switching between MouseMode.TRANSFORM and MouseMode.EDIT.
+html.P(html.B("Demo 7")+""" - This demonstrates switching between MouseMode.TRANSFORM and MouseMode.EDIT.
 Right-clicking on the canvas will toggle between rotating a shape (as in Demo 2)
 and editing it using the handles (as in Demo 6)."""),
-html.P(html.B("Demo 8")+""" - This demostrates how to check the position of a polygon relative to another polygon.
+html.P(html.B("Demo 8")+""" - This demonstrates how to check the position of a polygon relative to another polygon.
 Drag one of the yellow shapes, and its colour will change depending on its relationship with the white, fixed, polygon.
 Green=Inside, Pink=Overlapping, Yellow=Disjoint, Orange=Containing, and Blue=Equal.
 Right-click rotates a shape by 90 degrees.""")
