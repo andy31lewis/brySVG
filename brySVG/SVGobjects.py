@@ -317,22 +317,76 @@ class LineObject(svg.line, TransformMixin, NonBezierMixin):
         self.attrs["y2"] = y2
 
 class TextObject(svg.text):
-    def __init__(self, string, point, anchorpos=1, fontsize=12, style="normal"):
-        (x, y) = point
-        if anchorpos in [3, 4, 5]:
+    def __init__(self, canvas, string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
+        (x, y) = anchorpoint
+        stringlist = string.split("\n")
+        rowcount = len(stringlist)
+        if anchorposition in [3, 6, 9]:
             horizpos = "end"
-        elif anchorpos in [2, 6, 9]:
+        elif anchorposition in [2, 5, 8]:
             horizpos = "middle"
         else:
-            horizpos = "end"
-        if anchorpos in [5, 6, 7]:
-            yoffset = "0pt"
-        elif anchorpos in [4, 8, 9]:
-            yoffset = "6pt"
+            horizpos = "start"
+        if ignorescaling and "viewBox" in canvas.attrs:
+            bcr = canvas.getBoundingClientRect()
+            viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
+            xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
+            fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+        if anchorposition in [1, 2, 3]:
+            yoffset = fontsize
+        elif anchorposition in [4, 5, 6]:
+            yoffset = fontsize*(1-rowcount/2)
         else:
-            yoffset = "12pt"
+            yoffset = fontsize*(1-rowcount)
 
-        svg.text.__init__(self, string, x=x, y=y, font_size=fontsize, dy=yoffset, text_anchor=horizpos)
+        svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos)
+        for s in stringlist[1:]:
+            self <= svg.tspan(s, x=x, dy=fontsize)
+
+class WrappingTextObject(svg.text):
+    def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
+        (x, y) = anchorpoint
+        if ignorescaling and "viewBox" in canvas.attrs:
+            bcr = canvas.getBoundingClientRect()
+            viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
+            xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
+            fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+
+        words = string.split()
+        svg.text.__init__(self, "", x=x, font_size=fontsize)
+        canvas <= self
+        tspan = svg.tspan(words.pop(0), x=x, dy=0)
+        self <= tspan
+        rowcount = 1
+        for word in words:
+            tspan.text += " "+word
+            if tspan.getComputedTextLength() > width:
+                tspan.text = tspan.text[:-len(word)-1]
+                tspan = svg.tspan(word, x=x, dy=fontsize)
+                self <= tspan
+                rowcount += 1
+
+        if anchorposition in [3, 6, 9]:
+            horizpos = "end"
+        elif anchorposition in [2, 5, 8]:
+            horizpos = "middle"
+        else:
+            horizpos = "start"
+        self.attrs["text-anchor"] = horizpos
+        """
+        if ignorescaling and "viewBox" in canvas.attrs:
+            bcr = canvas.getBoundingClientRect()
+            viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
+            xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
+            fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+        """
+        if anchorposition in [1, 2, 3]:
+            yoffset = fontsize
+        elif anchorposition in [4, 5, 6]:
+            yoffset = fontsize*(1-rowcount/2)
+        else:
+            yoffset = fontsize*(1-rowcount)
+        self.attrs["y"] = y+yoffset
 
 class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixin):
     '''Wrapper for SVG polyline. Parameter:
