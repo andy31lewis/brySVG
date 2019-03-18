@@ -8,6 +8,7 @@ def onRightClick(event):
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo2"] <= canvas
+canvas.MouseMode = SVG.MouseMode.TRANSFORM
 canvas.bind("contextmenu", onRightClick)
 transformcycle = cycle(SVG.TransformType)
 
@@ -21,7 +22,7 @@ tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (5
         SVG.GroupObject([SVG.SmoothClosedBezierObject([(50,5), (5,80), (95,80)]),
                          SVG.PolylineObject([(0,0), (30,50), (70,50), (100,0)])])
         ]
-        
+
 for i, tile in enumerate(tiles):
     canvas.AddObject(tile)
     tile.translate((i*100, i*100))

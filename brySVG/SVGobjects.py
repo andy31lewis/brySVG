@@ -1042,6 +1042,7 @@ class CanvasObject(svg.svg):
         def AddToDict(svgobj):
             if not svgobj.id: svgobj.id = "id"+str(len(self.ObjectDict))
             self.ObjectDict[svgobj.id] = svgobj
+            svgobj.Fixed = fixed
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.ObjectList:
                     AddToDict(obj)
@@ -1049,7 +1050,6 @@ class CanvasObject(svg.svg):
         self <= svgobject
         AddToDict(svgobject)
         svgobject.Canvas = self
-        svgobject.Fixed = fixed
         return svgobject
 
     def ClearAll(self):
@@ -1353,6 +1353,7 @@ class Point(object):
         else:
             for i in range(len(self.coords)):
                 self.coords[i] += other.coords[i]
+        return self
 
     def __sub__(self, other):
         return Point([xi-yi for (xi, yi) in zip(self.coords, other.coords)])
