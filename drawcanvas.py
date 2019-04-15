@@ -113,15 +113,15 @@ class DrawCanvasMixin(object):
         if self.mouseDetected and isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
             self.mouseOwner.deletePoints(-2, None)
         self.mouseOwner = None
-        self.setMouseMode(MouseMode.EDIT)
+        self.mouseMode = MouseMode.EDIT
 
     def prepareEdit(self, event):
         #if self.tool != "select": return
         #self.mouseDetected = True if "mouse" in event.type else False
+        if self.selectedObject: self.deselectObject()
         svgobject = self.getSelectedObject(event.target.id, getGroup=False)
         #print("last object", self.selectedObject)
-        if self.selectedObject: self.deselectObject()
-        if not svgobject: return
+        if not svgobject or svgobject.fixed: return
         self.selectedObject = svgobject
         #print("this object", self.selectedObject)
         if isinstance(svgobject, BezierMixin):
@@ -141,12 +141,12 @@ class DrawCanvasMixin(object):
                     ch2.linkedHandle = ch0 if isinstance(svgobject, SmoothBezierMixin) else None
                     handle.controlHandles.append(ch2)
                 handles.append(handle)
-            self.handles = GroupObject(handles, "handles")
+            self.handles = GroupObject(handles)
             self <= self.handles
-            self.controlhandles = GroupObject([ch for handle in handles for ch in handle.controlHandles], "controlhandles")
+            self.controlhandles = GroupObject([ch for handle in handles for ch in handle.controlHandles])
             self <= self.controlhandles
         else:
-            self.handles = GroupObject([Handle(svgobject, i, coords, self) for i, coords in enumerate(svgobject.pointList)], "handles")
+            self.handles = GroupObject([Handle(svgobject, i, coords, self) for i, coords in enumerate(svgobject.pointList)])
             self <= self.handles
 
     def movePoint(self, event):
@@ -176,13 +176,13 @@ class DrawCanvasMixin(object):
         self.mouseOwner = None
 
     def deselectObject(self):
-        if self.selectedObject:
-            self.deleteObject(self.handles)
-            self.handles = None
-            if isinstance(self.selectedObject, BezierMixin):
-                self.deleteObject(self.controlhandles)
-                self.controlhandles = None
-            self.mouseOwner = self.selectedObject = self.selectedhandle = None
+        if not self.selectedObject: return
+        self.deleteObject(self.handles)
+        self.handles = None
+        if isinstance(self.selectedObject, BezierMixin):
+            self.deleteObject(self.controlhandles)
+            self.controlhandles = None
+        self.mouseOwner = self.selectedObject = self.selectedhandle = None
 
 class Handle(PointObject):
     def __init__(self, owner, index, coords, canvas):

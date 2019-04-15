@@ -186,7 +186,7 @@ class TransformCanvasMixin(object):
     def prepareTransform(self, event):
         #self.mouseDetected = True if "mouse" in event.type else False
         self.selectedObject = self.getSelectedObject(event.target.id)
-        if self.selectedObject:
+        if self.selectedObject and not self.selectedObject.fixed:
             self.showTransformHandles(self.selectedObject)
             if TransformType.TRANSLATE in self.transformTypes: self.transformHandles[TransformType.TRANSLATE].select(event)
         else:
@@ -287,9 +287,9 @@ class TransformCanvasMixin(object):
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
-        for objid in self.objectdict:
+        for objid in self.objectDict:
             if objid == svgobject.id: continue
-            obj = self.objectdict[objid]
+            obj = self.objectDict[objid]
             if not hasattr(obj, "pointList"): continue
             bbox = obj.getBBox()
             L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
@@ -298,7 +298,7 @@ class TransformCanvasMixin(object):
                 for point2 in svgobject.pointList:
                     (dx, dy) = point1 - point2
                     if abs(dx) < self.snap and abs(dy) < self.snap:
-                        pl1 = self.objectdict[objid].pointList
+                        pl1 = self.objectDict[objid].pointList
                         L = len(pl1)
                         i = pl1.index(point1)
                         vec1a = pl1[(i+1)%L] - point1
@@ -320,7 +320,7 @@ class TransformCanvasMixin(object):
                                 if testdiff < self.rotateSnap*pi/180:
                                     #print (pl1[i], pl2[j], g1, g2, diff)
                                     svgobject.rotate(diff*180/pi)
-                                    (dx, dy) = self.objectdict[objid].pointList[i] - svgobject.pointList[j]
+                                    (dx, dy) = self.objectDict[objid].pointList[i] - svgobject.pointList[j]
                                     #print (dx, dy)
                                     svgobject.translate((dx, dy))
                                     #print("rotatesnap", time.time()-tt)

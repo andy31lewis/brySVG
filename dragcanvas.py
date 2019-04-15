@@ -29,9 +29,7 @@ TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH E
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
 class TransformMixin(object):
-    '''Provides methods for objects to be cloned, translated, rotated, stretched or enlarged.
-    Note that if no mouse interaction is needed with the objects after the transformation, it is better to use the
-    translateElement, rotateElement, scaleElement methods provided by the CanvasObject, as they are much faster.'''
+    '''In MouseMode.DRAG, this just provides the cloneObject method for all svgobjects'''
 
     def cloneObject(self):
         '''Returns a clone of an object, including the extra functionality provided by this module.
@@ -75,6 +73,7 @@ class BezierMixin(object):
 class SmoothBezierMixin(BezierMixin):
     '''Extra methods for SmoothBezierObject and SmoothClosedBezierObject.'''
     def calculatecontrolpoints(self, points):
+        '''Not intended to be called by end users.'''
         [(x1, y1), (x2, y2), (x3, y3)] = points
         (dx1, dy1) = ((x2-x1), (y2-y1))
         (dx3, dy3) = ((x2-x3), (y2-y3))
@@ -91,6 +90,7 @@ class SmoothBezierMixin(BezierMixin):
         return (Point(c1), Point(c2))
 
 class LineObject(svg.line, TransformMixin, NonBezierMixin):
+    '''A wrapper for SVG line.'''
     def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None):
         [(x1, y1), (x2, y2)] = pointlist
 
@@ -114,6 +114,12 @@ class LineObject(svg.line, TransformMixin, NonBezierMixin):
         self.attrs["y2"] = y2
 
 class TextObject(svg.text):
+    '''A multiline textbox.  Use "\n" to separate lines. To make sure the font-size is not affected by the scaling of the
+    canvas, set ignorescaling to True, and specify the canvas on which the object will be placed.
+    The box is placed at the coordinates given by anchorpoint; the anchorposition can be from 1 to 9:
+    1  2  3  ie if anchorposition is 1, the anchorpoint is top-left, if it is 5 it is in the centre of the box, etc
+    4  5  6
+    7  8  9'''
     def __init__(self, string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None):
         (x, y) = anchorpoint
         stringlist = string.split("\n")
@@ -139,6 +145,8 @@ class TextObject(svg.text):
             self <= svg.tspan(s, x=x, dy=fontsize)
 
 class WrappingTextObject(svg.text):
+    '''See TextObject above for explanation of most of the parameters; however, note that canvas must be specified.
+    A width in SVG units is also specified, and text will be wrapped at word boundaries to fit that width.'''
     def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
         (x, y) = anchorpoint
         if ignorescaling and "viewBox" in canvas.attrs:
@@ -267,7 +275,8 @@ class CircleObject(svg.circle, TransformMixin, NonBezierMixin):
 
 class BezierObject(svg.path, BezierMixin, TransformMixin):
     '''Wrapper for svg path element.  Parameter:
-    pointsetlist: a list of tuples, each tuple consisting of three points:
+    EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
+    OR  pointsetlist: a list of tuples, each tuple consisting of three points:
     (previous-control-point, vertex, next-control-point).
     For the first vertex, the previous-control-point must be None,
     and for the last vertex, the next-control-point must be None.'''
@@ -305,7 +314,8 @@ class BezierObject(svg.path, BezierMixin, TransformMixin):
 
 class ClosedBezierObject(svg.path, BezierMixin, TransformMixin):
     '''Wrapper for svg path element.  Parameter:
-    pointsetlist: a list of tuples, each tuple consisting of three points:
+    EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
+    OR  pointsetlist: a list of tuples, each tuple consisting of three points:
     (previous-control-point, vertex, next-control-point).
     The path will be closed (the first vertex does not need to be repeated).'''
     def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
@@ -423,7 +433,6 @@ class RegularPolygon(PolygonObject):
     EITHER centre: the centre of the polygon, OR startpoint: the coordinates of a vertex at the top of the polygon
     EITHER radius: the radius of the polygon, OR sidelength: the length of each side
     offsetangle: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.'''
-
     def __init__(self, sidecount, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
         angle = 2*pi/sidecount
         radoffset = offsetangle*pi/180
@@ -442,9 +451,8 @@ class GroupObject(svg.g, TransformMixin):
     '''Wrapper for SVG g element. Parameters:
     objlist: list of the objects to include in the group
     id: (optional) id to identify the element in the DOM'''
-    def __init__(self, objlist=[], objid=None):
+    def __init__(self, objlist=[]):
         svg.g.__init__(self)
-        if objid: self.attrs["id"] = objid
         if not isinstance(objlist, list): objlist = [objlist]
         self.ObjectList = []
         for obj in objlist:
@@ -452,10 +460,15 @@ class GroupObject(svg.g, TransformMixin):
         self._Canvas = None
         self.Group = None
 
-    def addObject(self, svgobject):
+    def addObject(self, svgobject, objid=None, fixed=False):
         self <= svgobject
+        if objid: svgobject.attrs["id"] = objid
+        if not hasattr(svgobject, "fixed"): svgobject.fixed = fixed
         svgobject.Group = self
         self.ObjectList.append(svgobject)
+
+    def addObjects(self, objectlist, fixed=False):
+        for obj in objectlist: self.addObject(obj, fixed=fixed)
 
     def deleteAll(self):
         while self.firstChild:
@@ -473,28 +486,57 @@ class GroupObject(svg.g, TransformMixin):
             obj.canvas = canvas
 
 class Button(GroupObject):
-    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="yellow"):
+    '''A clickable button with (multiline) text on it. If fontsize is not specified, the text will be scaled to fit
+    the height (but not width) of the button. The onclick parameter is the function which handles the event.'''
+    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="yellow", objid=None):
+        GroupObject.__init__(self)
+        if objid: self.id = objid
         (x, y), (width, height) = position, size
-        button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
-        button.attrs["rx"] = height/3
+        self.button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
+        self.button.attrs["rx"] = height/3
         rowcount = text.count("\n") + 1
         if not fontsize: fontsize = height*0.8/rowcount
         text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
-        self <= [button, text]
+        self.addObjects([button, text], fixed=True)
+        self.bind("mousedown", self.onMouseDown)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)
         self.attrs["cursor"] = "pointer"
 
+    def onMouseDown(self, event):
+        event.stopPropagation()
+
+    def setBackgroundColour(self, colour):
+        self.button.style.fill = colour
+
 class ImageButton(GroupObject):
-    def __init__(self, position, size, image, onclick, fillcolour="yellow"):
+    '''A clickable button with an SVG image on it. The centre of the image should be at (0,0).
+    If the canvas is specified, the image will be scaled to fit inside the button.
+    The onclick parameter is the function which handles the event.'''
+    def __init__(self, position, size, image, onclick, fillcolour="yellow", canvas=None, objid=None):
+        GroupObject.__init__(self)
+        if objid: self.id = objid
         (x, y), (width, height) = position, size
-        button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
-        button.attrs["rx"] = height/3
+        self.button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
+        self.button.attrs["rx"] = height/3
         image.attrs["transform"] = "translate({},{})".format(x+width/2, y+height/2)
-        self <= [button, image]
+        if canvas:
+            canvas <= image
+            bbox = image.getBBox()
+            canvas.removeChild(image)
+            scalefactor = min(width/bbox.width, height/bbox.height)*0.7
+            image.attrs["transform"] += " scale({})".format(scalefactor)
+        self.addObjects([self.button, image], fixed=True)
+        self.bind("mousedown", self.onMouseDown)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)
         self.attrs["cursor"] = "pointer"
+
+    def onMouseDown(self, event):
+        event.stopPropagation()
+
+    def setBackgroundColour(self, colour):
+        self.button.style.fill = colour
 
 class CanvasObject(svg.svg):
     '''Wrapper for SVG svg element.  Parameters:
@@ -503,14 +545,21 @@ class CanvasObject(svg.svg):
     colour: the background colour
     id: the DOM id
 
+    To add objects to the canvas, use canvas.addObject.
+    Objects are stored in canvas.objectDict using their id as the dictionary key. (if not supplied, ids are made up.)
     After creation, there are various attributes which control how the canvas responds to mouse actions:
 
+    canvas.mouseMode = MouseMode.DRAG
+        Objects can be dragged around on the canvas
+
     canvas.mouseMode = MouseMode.TRANSFORM
-        ***Clicking on an object and dragging carries out the transformation
-        which has been set using canvas.setMouseTransformType().  This can be:
-        TransformType.NONE, TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE
+        ***To enable this mode, use import transformcanvas or import fullcanvas instead of import dragcanvas***
+        Objects can be dragged around on the canvas.  In addition, clicking on an object shows a bounding box
+        and a number of handles (which ones can be controlled by setting self.transformTypes to the list of transforms
+        required. By default, self transforms includes:
+        [TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]
         canvas.snap: set to a number of pixels. After a transform, if a vertex of the transformed object is within
-            this many pixels of a vertex of another object in the canvas's objectdict, the transformed object is snapped
+            this many pixels of a vertex of another object in the canvas's objectDict, the transformed object is snapped
             so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.
             If canvas.snap is set to None (the default), no snapping will be done.
         canvas.rotateSnap: set to a number of degrees. After a transform, if a snap is to be done, and the edges
@@ -519,51 +568,52 @@ class CanvasObject(svg.svg):
             If canvas.rotateSnap is set to None (the default), no rotating will be done.
 
     canvas.mouseMode = MouseMode.DRAW
+        ***To enable this mode, use import drawcanvas or import fullcanvas instead of import dragcanvas***
         Shapes can be drawn on the canvas by clicking, moving, clicking again...
-        A shape is completed by double-clicking.
+        A shape is completed by double-clicking, which also switches the canvas to MouseMode.EDIT (see below).
         The shape which will be drawn is chosen by setting canvas.tool, which can be:
         line, polygon, polyline, rectangle, ellipse, circle, bezier, closedbezier, smoothbezier, smoothclosedbezier
-        The stroke, stroke-width and fill of the shape are set by canvas.penColour, canvas.penWidth, and canvas.fillColour
+        The stroke, stroke-width and fill of the shape are set by canvas.penColour, canvas.penWidth, and canvas.fillColour.
 
     canvas.mouseMode = MouseMode.EDIT
+        ***To enable this mode, use import drawcanvas or import fullcanvas instead of import dragcanvas***
         Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape.
-        (For Bezier shapes there are also "control handles" to control the curvature.)
+        (For Bezier shapes clicking on a handle causes "control handles" to be displayed, to control the curvature.)
         While a shape is selected, pressing the DEL key on the keyboard will delete the shape.
-        canvas.selectedObject is the shape curently being edited.
-        Use canvas.deselectObject to stop editing a shape and hide the handles.
+        Clicking elsewhere on the canvas deselects the shape.
 
     canvas.mouseMode = MouseMode.NONE
         No user interaction with the canvas.
     '''
 
-    def __init__(self, width, height, colour="white", id=None):
+    def __init__(self, width, height, colour="white", objid=None):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
-        if id: self.id = id
-        self.scaleFactor = 1
-        #self.shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-        #"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
-        #"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
-        self.cursors = ["auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
-        self.objectdict = {}
+        if objid: self.id = objid
+        self.objectDict = {} # See above .
+        #Attributes intended to be read/write for users - see above for usage
+        #self._mouseMode = None
         self.mouseMode = MouseMode.DRAG
         self.transformTypes = TransformType
-        self.mouseDetected = False
-        #self.setMouseTransformType(TransformType.NONE)
-        self.mouseOwner = None
-        self.selectedObject = None
-        self.transformorigin = None
-        self.transformBBox = RectangleObject(linecolour="blue", fillcolour=None)
-        self.transformHandles = []
-        self.handles = None
-        self.controlhandles  = None
-        self.selectedhandle = None
-        self.hittargets = []
         self.snap = None
         self.rotateSnap = None
         self.tool = "select"
         self.penColour = "black"
         self.fillColour  = "yellow"
         self.penWidth = 3
+        #Attributes intended to be read-only for users
+        self.scaleFactor = 1 #Multiply by this to convert CSS pixels to SVG units
+        self.mouseDetected = False #If false, indicates a touchscreen device
+        self.mouseOwner = None #The object (shape or handle) durrently being dragged
+        self.selectedObject = None #The shape which was last clicked on or dragged
+        #Attributes not intended to be used by end-users
+        self.objectDict = {}
+        self.hittargets = []
+        self.handles = None
+        self.controlhandles  = None
+        self.transformHandles = []
+        self.selectedhandle = None
+        self.transformorigin = None
+        self.transformBBox = RectangleObject(linecolour="blue", fillcolour=None)
         self.bind("mousedown", self.onMouseDown)
         self.bind("mousemove", self.onMouseMove)
         self.bind("mouseup", self.onLeftUp)
@@ -576,10 +626,11 @@ class CanvasObject(svg.svg):
 
     def setDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
-        call this after creation to set the SVG width and height attributes.'''
+        call this after adding to the page to set the SVG width and height attributes.'''
         bcr = self.getBoundingClientRect()
         self.attrs["width"] = bcr.width
         self.attrs["height"] = bcr.height
+        return bcr.width, bcr.height
 
     def fitContents(self):
         '''Scales the canvas so that all the objects on it are visible.'''
@@ -590,6 +641,7 @@ class CanvasObject(svg.svg):
         #self.attrs["preserveAspectRatio"] = "none"
 
     def getScaleFactor(self):
+        '''Recalculates self.scaleFactor. Call this after zooming in or out of the canvas.'''
         bcr = self.getBoundingClientRect()
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
         self <= RectangleObject([(vbleft, vbtop), (vbleft+vbwidth, vbtop+vbheight)], 0, "red", 1, None)
@@ -605,14 +657,14 @@ class CanvasObject(svg.svg):
         return Point((SVGpt.x, SVGpt.y))
 
     def addObject(self, svgobject, objid=None, fixed=False):
-        '''Adds an object to the canvas, and also adds it to the canvas's objectdict so that it can be referenced
-        using canvas.objectdict[id]. This is also needed for the object to be capable of being snapped to.
+        '''Adds an object to the canvas, and also adds it to the canvas's objectDict so that it can be referenced
+        using canvas.objectDict[id]. This is also needed for the object to be capable of being snapped to.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
-        If it is not desired that an object should be in the objectdict, just add it to the canvas using Brython's <= method.'''
+        If it is not desired that an object should be in the objectDict, just add it to the canvas using Brython's <= method.'''
         def AddToDict(svgobj, fixed):
-            if not svgobj.id: svgobj.id = "id"+str(len(self.objectdict))
-            self.objectdict[svgobj.id] = svgobj
-            svgobj.Fixed = fixed
+            if not svgobj.id: svgobj.id = "id"+str(len(self.objectDict))
+            self.objectDict[svgobj.id] = svgobj
+            if not hasattr(svgobj, "fixed"): svgobj.fixed = fixed
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.ObjectList:
                     AddToDict(obj, fixed)
@@ -623,10 +675,11 @@ class CanvasObject(svg.svg):
         return svgobject
 
     def deleteObject(self, svgobject):
+        '''Delete an object from the canvas'''
         if not svgobject: return
         self.removeChild(svgobject)
         try:
-            del self.objectdict[svgobject.id]
+            del self.objectDict[svgobject.id]
         except (AttributeError, KeyError):
             pass
 
@@ -634,10 +687,10 @@ class CanvasObject(svg.svg):
         '''Clear all elements from the canvas'''
         while self.firstChild:
             self.removeChild(self.firstChild)
-        self.objectdict = {}
+        self.objectDict = {}
 
     def deleteSelection(self,event):
-        #print (event.target, event.currentTarget)
+        '''Delete the currently selected object'''
         if event.keyCode == 46:
             if self.selectedObject:
                 if self.handles: self.deleteObject(self.handles)
@@ -657,13 +710,6 @@ class CanvasObject(svg.svg):
         element.transform.baseVal.insertItemBefore(t, 0)
         return t.matrix
 
-    def translateElement(self, element, vector):
-        '''Translate an element by vector.'''
-        t = svgbase.createSVGTransform()
-        t.setTranslate(*vector)
-        element.transform.baseVal.insertItemBefore(t, 0)
-        return t.matrix
-
     def scaleElement(self, element, xscale, yscale=None):
         '''Enlarge or stretch an element by scale factors xscale and yscale, with centre (0, 0).
         If yscale is not given, it is equal to xscale, ie the element is enlarged without stretching.'''
@@ -673,29 +719,60 @@ class CanvasObject(svg.svg):
         element.transform.baseVal.insertItemBefore(t, 0)
         return t.matrix
 
-    def setMouseMode(self, mm):
-        self.mouseMode = mm
-        if mm != MouseMode.DRAW:
-            self.tool = "select"
+    def translateElement(self, element, vector):
+        '''Translate an element by vector.'''
+        t = svgbase.createSVGTransform()
+        t.setTranslate(*vector)
+        element.transform.baseVal.insertItemBefore(t, 0)
+        return t.matrix
+
+    def translateObject(self, svgobject, offset):
+        '''Translate an svgobject by offset.  Unlike translateElement, this will also preserve the extra
+        functionality provided by this module - ie the shape will still be able to be selected, dragged, etc.'''
+        offset = Point(offset)
+        if isinstance(svgobject, GroupObject):
+            for obj in svgobject.ObjectList:
+                self.translateObject(obj, offset)
+        elif isinstance(svgobject, PointObject):
+            svgobject.XY += offset
+        else:
+            svgobject.pointList = [point+offset for point in svgobject.pointList]
+            if isinstance(svgobject, BezierMixin):
+                svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
+            svgobject.update()
+            hittarget = getattr(svgobject, "hitTarget", None)
+            if hittarget:
+                hittarget.pointList = svgobject.pointList
+                if isinstance(svgobject, BezierMixin): hittarget.pointsetList = svgobject.pointsetList
+                hittarget.update()
+
+    #The methods below are not intended to be called by end-users.
+    @property
+    def mouseMode(self):
+        return self._mouseMode
+
+    @mouseMode.setter
+    def mouseMode(self, mm):
+        currentmm = getattr(self, "_mouseMode", None)
+        if currentmm == mm: return
+        if currentmm == MouseMode.TRANSFORM: self.hideTransformHandles()
+        elif currentmm == MouseMode.EDIT: self.deselectObject()
+
+        self._mouseMode = mm
+        self.tool = "select"
         if mm in [MouseMode.DRAG, MouseMode.EDIT, MouseMode.TRANSFORM]:
-            for obj in self.objectdict.values():
-                if obj.style.fill != "none" or obj.Fixed: continue
+            for obj in self.objectDict.values():
+                if obj.style.fill != "none" or obj.fixed: continue
                 if hasattr(obj, "hitTarget"): continue
                 if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
                 newobj = obj.cloneObject()
                 newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
-                #newobj.style.strokeWidth = 25*self.scaleFactor
                 newobj.style.opacity = 0.2
                 newobj.reference = obj
                 obj.hitTarget = newobj
                 self.hittargets.append(newobj)
                 self.addObject(newobj)
-    """
-    def setMouseTransformType(self, mtt):
-        '''Set canvas.MouseTransformType and show the appropriate cursor.'''
-        self.MouseTransformType = mtt
-        self.style.cursor = self.cursors[mtt]
-    """
+
     def onRightClick(self, event):
         event.preventDefault()
 
@@ -716,7 +793,7 @@ class CanvasObject(svg.svg):
     def onMouseDown(self, event):
         if not self.mouseDetected:
             self.mouseDetected = True
-            for obj in self.objectdict.values():
+            for obj in self.objectDict.values():
                 if hasattr(obj, "reference"):
                     obj.style.strokeWidth = 10*self.scaleFactor
         if event.button > 0: return
@@ -757,7 +834,7 @@ class CanvasObject(svg.svg):
 
     def prepareDrag(self, event):
         self.mouseOwner = self.selectedObject = self.getSelectedObject(event.target.id)
-        if not self.mouseOwner or self.mouseOwner.Fixed: return
+        if not self.mouseOwner or self.mouseOwner.fixed: return
         self.StartPoint = self.getSVGcoords(event)
         self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -784,7 +861,7 @@ class CanvasObject(svg.svg):
 
     def getSelectedObject(self, objectid, getGroup = True):
         try:
-            svgobj = self.objectdict[objectid]
+            svgobj = self.objectDict[objectid]
         except KeyError:
             return
         try:
@@ -802,9 +879,9 @@ class CanvasObject(svg.svg):
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
-        for objid in self.objectdict:
+        for objid in self.objectDict:
             if objid == svgobject.id: continue
-            obj = self.objectdict[objid]
+            obj = self.objectDict[objid]
             if not hasattr(obj, "pointList"): continue
             bbox = obj.getBBox()
             L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
@@ -818,24 +895,6 @@ class CanvasObject(svg.svg):
         if bestdx or bestdy:
             self.translateObject(svgobject, Point((bestdx, bestdy)))
         #print("snap", time.time()-tt)
-
-    def translateObject(self, svgobject, offset):
-        offset = Point(offset)
-        if isinstance(svgobject, GroupObject):
-            for obj in svgobject.ObjectList:
-                self.translateObject(obj, offset)
-        elif isinstance(svgobject, PointObject):
-            svgobject.XY += offset
-        else:
-            svgobject.pointList = [point+offset for point in svgobject.pointList]
-            if isinstance(svgobject, BezierMixin):
-                svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
-            svgobject.update()
-            hittarget = getattr(svgobject, "hitTarget", None)
-            if hittarget:
-                hittarget.pointList = svgobject.pointList
-                if isinstance(svgobject, BezierMixin): hittarget.pointsetList = svgobject.pointsetList
-                hittarget.update()
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''

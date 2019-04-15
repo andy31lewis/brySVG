@@ -28,7 +28,6 @@ colours = ["orange", "green", "pink", "blue", "yellow"]
 
 canvas = SVG.CanvasObject("98vw", "90vh", "oldlace")
 document["demo8"] <= canvas
-canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
 canvas.snap = 7
 canvas.bind("mouseup", checkposition)
 canvas.bind("touchend", checkposition)

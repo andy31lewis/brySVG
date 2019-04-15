@@ -2,8 +2,7 @@ from browser import document
 import time
 print("Starting")
 tt = time.time()
-import brySVG as SVG
-#import SVGobjects as SVG
+import transformcanvas as SVG
 print(time.time()-tt)
 
 
@@ -22,9 +21,9 @@ tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (5
         ]
 
 for i, tile in enumerate(tiles):
-    canvas.AddObject(tile)
+    canvas.addObject(tile)
     tile.translate((i*100, i*100))
 canvas.fitContents()
-canvas.setMouseMode(SVG.MouseMode.TRANSFORM)
-print(time.time()-tt)
+canvas.mouseMode = SVG.MouseMode.TRANSFORM
+print("finished", time.time()-tt)
 
