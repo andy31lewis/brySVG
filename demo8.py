@@ -1,19 +1,22 @@
 from browser import document
-import brySVG as SVG
 import time
+tt = time.time()
+import transformcanvas as SVG
+from polygontesting import *
+print(time.time()-tt)
 
 def onDoubleClick(event):
     event.preventDefault()
-    if event.target.id and event.target.id != "fixed":
-        canvas.ObjectDict[event.target.id].rotate(90)
-        result = canvas.ObjectDict[event.target.id].positionRelativeTo(fixedshape)
-        canvas.ObjectDict[event.target.id].style.fill = colours[result]
+    if canvas.selectedObject and canvas.selectedObject.id != "fixed":
+        canvas.selectedObject.rotate(90)
+        result = relativeposition(canvas.selectedObject, fixedshape)
+        canvas.selectedObject.style.fill = colours[result]
 
 def checkposition(event):
     event.preventDefault()
     if (event.type == "mouseup" and event.button > 1) or not canvas.selectedObject: return
     tt = time.time()
-    result = canvas.selectedObject.positionRelativeTo(fixedshape)
+    result = relativeposition(canvas.selectedObject, fixedshape)
     print("position", time.time()-tt)
     canvas.selectedObject.style.fill = colours[result]
 
@@ -26,14 +29,14 @@ colours = ["orange", "green", "pink", "blue", "yellow"]
 canvas = SVG.CanvasObject("98vw", "90vh", "oldlace")
 document["demo8"] <= canvas
 canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
-canvas.Snap = 7
+canvas.snap = 7
 canvas.bind("mouseup", checkposition)
 canvas.bind("touchend", checkposition)
 canvas.bind("dblclick", onDoubleClick)
 
-canvas.AddObject(fixedshape, objid="fixed", fixed=True)
+canvas.addObject(fixedshape, objid="fixed", fixed=True)
 for points in shapes:
     shape = SVG.PolygonObject(points)
     shape.style.fillOpacity = 0.8
-    canvas.AddObject(shape)
+    canvas.addObject(shape)
 canvas.fitContents()
