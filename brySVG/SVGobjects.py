@@ -9,10 +9,26 @@
 # MA 02111-1307 USA                                                           #
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
-from browser import document
+import time
+#tt = time.time()
+from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
+mouseDetected = False
+lasttaptime = 0
+
+def detectMouse(event):
+    global mouseDetected
+    #print(event.type)
+    if event.type == "mousemove":
+        mouseDetected = True
+    document.unbind("mousemove", detectMouse)
+    document.unbind("touchstart", detectMouse)
+    print(mouseDetected)
+document.bind("mousemove", detectMouse)
+document.bind("touchstart", detectMouse)
+
 
 class Enum(list):
     def __init__(self, name, string):
@@ -21,7 +37,7 @@ class Enum(list):
             setattr(self, value, i)
             self.append(i)
 
-MouseMode = Enum('MouseMode', 'NONE TRANSFORM DRAW EDIT')
+MouseMode = Enum('MouseMode', 'NONE DRAG TRANSFORM DRAW EDIT')
 TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
@@ -50,6 +66,7 @@ class TransformMixin(object):
             newobject.SetPointsets(self.PointsetList)
         else:
             newobject.SetPoints(self.PointList)
+        if hasattr(self, "angle"): newobject.angle = self.angle
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         return newobject
@@ -106,6 +123,7 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setTranslate(*vector)
             self.matrixTransform(t.matrix)
+        #print (time.time()-tt)
 
     def rotate(self, angle, centre=None):
         '''Rotate object clockwise by angle degrees around centre.
@@ -135,6 +153,7 @@ class TransformMixin(object):
             (x2, y2) = vec2
             (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
             angle = atan2(y3, x3)*180/pi
+            #print("Final angle", angle)
             if isinstance(self, (EllipseObject, RectangleObject)):
                 self.angle += angle
             matrix = svgbase.createSVGMatrix()
@@ -150,11 +169,16 @@ class TransformMixin(object):
             for obj in self.ObjectList:
                 obj.xstretch(xscale, cx)
         else:
+            angle = 0
+            if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+                angle = self.angle
+                self.rotate(-angle)
             matrix = svgbase.createSVGMatrix()
             matrix = matrix.translate(cx, 0)
             matrix.a = xscale
             matrix = matrix.translate(-cx, 0)
             self.matrixTransform(matrix)
+            if angle != 0: self.rotate(angle)
 
     def ystretch(self, yscale, cy=0):
         '''Stretch object in the y-direction by scale factor yscale, with invariant line y = cy.
@@ -163,11 +187,16 @@ class TransformMixin(object):
             for obj in self.ObjectList:
                 obj.ystretch(yscale, cy)
         else:
+            angle = 0
+            if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+                angle = self.angle
+                self.rotate(-angle)
             matrix = svgbase.createSVGMatrix()
             matrix = matrix.translate(0, cy)
             matrix.d = yscale
             matrix = matrix.translate(0, -cy)
             self.matrixTransform(matrix)
+            if angle != 0: self.rotate(angle)
 
     def enlarge(self, scalefactor, centre):
         '''Enlarge object by scale factor scalefactor, from centre.
@@ -201,7 +230,7 @@ class NonBezierMixin(object):
         if self.Canvas.SelectedShape:
             self.Canvas.DeSelectShape()
         self.Canvas.SelectedShape = self
-        self.Handles = GroupObject([Handle(self, i, coords) for i, coords in enumerate(self.PointList)], "handles")
+        self.Handles = GroupObject([Handle(self, i, coords, self.Canvas) for i, coords in enumerate(self.PointList)], "handles")
         self.Canvas <= self.Handles
 
 class PolyshapeMixin(object):
@@ -218,7 +247,9 @@ class BezierMixin(object):
     '''Methods for BezierObject and ClosedBezierObject.'''
     def SetPointset(self, i, pointset):
         self.PointsetList[i] = pointset
+        tt = time.time()
         self.Update()
+        #print("Update", time.time()-tt)
 
     def SetPointsets(self, pointsetlist):
         self.PointsetList = pointsetlist
@@ -230,14 +261,14 @@ class BezierMixin(object):
             self.Canvas.DeSelectShape()
         self.Canvas.SelectedShape = self
         pointlist = [pointset[1] for pointset in self.PointsetList]
-        self.Handles = GroupObject([Handle(self, i, coords) for i, coords in enumerate(pointlist)], "handles")
+        self.Handles = GroupObject([Handle(self, i, coords, self.Canvas) for i, coords in enumerate(pointlist)], "handles")
         self.Canvas <= self.Handles
 
         controlhandles = []
         for i, (point0, point1, point2) in enumerate(self.PointsetList):
-            if point0 is None: controlhandles.append((ControlHandle(self, i, 2, point2), ))
-            elif point2 is None: controlhandles.append((ControlHandle(self, i, 0, point0), ))
-            else: controlhandles.append((ControlHandle(self, i, 0, point0), ControlHandle(self, i, 2, point2)))
+            if point0 is None: controlhandles.append((ControlHandle(self, i, 2, point2, self.Canvas), ))
+            elif point2 is None: controlhandles.append((ControlHandle(self, i, 0, point0, self.Canvas), ))
+            else: controlhandles.append((ControlHandle(self, i, 0, point0, self.Canvas), ControlHandle(self, i, 2, point2, self.Canvas)))
         self.ControlHandles = controlhandles
         self.ControlHandlesGroup = GroupObject([ch for chset in controlhandles for ch in chset], "controlhandles")
         self.Canvas <= self.ControlHandlesGroup
@@ -247,7 +278,9 @@ class SmoothBezierMixin(object):
     def SetPointset(self, i, pointset):
         self.PointList[i] = pointset[1]
         self.PointsetList[i] = pointset
+        tt = time.time()
         self.Update()
+        #print("Update", time.time()-tt)
 
     def SetPointsets(self, pointsetlist):
         self.PointList = [pointset[1] for pointset in pointsetlist]
@@ -317,7 +350,7 @@ class LineObject(svg.line, TransformMixin, NonBezierMixin):
         self.attrs["y2"] = y2
 
 class TextObject(svg.text):
-    def __init__(self, canvas, string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
+    def __init__(self, string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None):
         (x, y) = anchorpoint
         stringlist = string.split("\n")
         rowcount = len(stringlist)
@@ -327,11 +360,12 @@ class TextObject(svg.text):
             horizpos = "middle"
         else:
             horizpos = "start"
-        if ignorescaling and "viewBox" in canvas.attrs:
-            bcr = canvas.getBoundingClientRect()
-            viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
-            xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
-            fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+        if ignorescaling and canvas and "viewBox" in canvas.attrs:
+            #bcr = canvas.getBoundingClientRect()
+            #viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
+            #xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
+            #fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+            fontsize = fontsize*canvas.scaleFactor
         if anchorposition in [1, 2, 3]:
             yoffset = fontsize
         elif anchorposition in [4, 5, 6]:
@@ -340,6 +374,7 @@ class TextObject(svg.text):
             yoffset = fontsize*(1-rowcount)
 
         svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos)
+        #canvas <= self
         for s in stringlist[1:]:
             self <= svg.tspan(s, x=x, dy=fontsize)
 
@@ -347,11 +382,11 @@ class WrappingTextObject(svg.text):
     def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
         (x, y) = anchorpoint
         if ignorescaling and "viewBox" in canvas.attrs:
-            bcr = canvas.getBoundingClientRect()
-            viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
-            xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
-            fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
-
+            #bcr = canvas.getBoundingClientRect()
+            #viewboxsize = [float(x) for x in canvas.attrs["viewBox"].split()[-2:]]
+            #xscaling, yscaling = viewboxsize[0]/bcr.width, viewboxsize[1]/bcr.height
+            #fontsize = fontsize*xscaling if xscaling>yscaling else fontsize*yscaling
+            fontsize = fontsize*canvas.scaleFactor
         words = string.split()
         svg.text.__init__(self, "", x=x, font_size=fontsize)
         canvas <= self
@@ -741,6 +776,7 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
+        self.rotatestring = self.attrs["transform"]
 
         basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
@@ -765,6 +801,7 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.transform.baseVal.initialize(t)
+        self.rotatestring = self.attrs["transform"]
 
         basepointlist = self.transformedPointList(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
@@ -870,9 +907,10 @@ class PointObject(svg.circle, TransformMixin):
     '''A point (small circle) on a diagram. Parameters:
     XY: the coordinates of the point,
     pointsize: (optional) the radius of the point.'''
-    def __init__(self, XY=(0,0), colour="black", pointsize=2):
+    def __init__(self, XY=(0,0), colour="black", pointsize=2, canvas=None):
         (x, y) = XY
-        svg.circle.__init__(self, cx=x, cy=y, r=pointsize, style={"stroke":colour, "strokeWidth":1, "fill":colour})
+        sf = canvas.scaleFactor if canvas else 1
+        svg.circle.__init__(self, cx=x, cy=y, r=pointsize*sf, style={"stroke":colour, "strokeWidth":1, "fill":colour})
         self._XY = None
         self.XY = Point(XY)
 
@@ -913,7 +951,7 @@ class RegularPolygon(PolygonObject):
 class GroupObject(svg.g, TransformMixin):
     '''Wrapper for SVG g element. Parameters:
     objlist: list of the objects to include in the group
-    id: (optional) id to indetify the element in the DOM'''
+    id: (optional) id to identify the element in the DOM'''
     def __init__(self, objlist=[], objid=None):
         svg.g.__init__(self)
         if objid: self.attrs["id"] = objid
@@ -943,6 +981,30 @@ class GroupObject(svg.g, TransformMixin):
         self._Canvas = canvas
         for obj in self.ObjectList:
             obj.Canvas = canvas
+
+class Button(GroupObject):
+    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="yellow"):
+        (x, y), (width, height) = position, size
+        button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
+        button.attrs["rx"] = height/3
+        rowcount = text.count("\n") + 1
+        if not fontsize: fontsize = height*0.8/rowcount
+        text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
+        self <= [button, text]
+        self.bind("click", onclick)
+        self.bind("touchstart", onclick)
+        self.attrs["cursor"] = "pointer"
+
+class ImageButton(GroupObject):
+    def __init__(self, position, size, image, onclick, fillcolour="yellow"):
+        (x, y), (width, height) = position, size
+        button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
+        button.attrs["rx"] = height/3
+        image.attrs["transform"] = "translate({},{})".format(x+width/2, y+height/2)
+        self <= [button, image]
+        self.bind("click", onclick)
+        self.bind("touchstart", onclick)
+        self.attrs["cursor"] = "pointer"
 
 class CanvasObject(svg.svg):
     '''Wrapper for SVG svg element.  Parameters:
@@ -990,25 +1052,32 @@ class CanvasObject(svg.svg):
     def __init__(self, width, height, colour="white", id=None):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
         if id: self.id = id
+        self.scaleFactor = 1
         self.ShapeTypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject, "rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject, "bezier":SmoothBezierObject, "closedbezier":SmoothClosedBezierObject}
         self.Cursors = ["auto", "move", "url(brySVG/rotate.png), auto", "col-resize", "row-resize", "url(brySVG/enlarge.png), auto"]
         #for tt in TransformType: self.setMouseTransformType(tt)
         self.ObjectDict = {}
-        self.MouseMode = MouseMode.TRANSFORM
+        self.MouseMode = MouseMode.DRAG
+        self.transformTypes = TransformType
         self.setMouseTransformType(TransformType.NONE)
         self.MouseOwner = None
         self.LastMouseOwner = None
         self.SelectedShape = None
         self.TransformOrigin = None
+        self.transformBox = RectangleObject(linecolour="blue", fillcolour=None)
+        self.transformHandles = []
         self.Snap = None
         self.RotateSnap = None
         self.Tool = "select"
         self.PenColour = "black"
         self.FillColour  = "yellow"
         self.PenWidth = 5
-        self.bind("mousedown", self.onLeftDown)
+        self.bind("mousedown", self.onMouseDown)
         self.bind("mousemove", self.onMouseMove)
         self.bind("mouseup", self.onLeftUp)
+        self.bind("touchstart", self.onTouchStart)
+        self.bind("touchmove", self.onMouseMove)
+        self.bind("touchend", self.onLeftUp)
         self.bind("dragstart", self.onDragStart)
         self.bind("dblclick", self.onDoubleClick)
         document.bind("keydown", self.DeleteSelection)
@@ -1016,21 +1085,30 @@ class CanvasObject(svg.svg):
     def setDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
         call this after creation to set the SVG width and height attributes.'''
-        bbox = self.getBoundingClientRect()
-        self.attrs["width"] = bbox.width
-        self.attrs["height"] = bbox.height
+        bcr = self.getBoundingClientRect()
+        self.attrs["width"] = bcr.width
+        self.attrs["height"] = bcr.height
 
     def fitContents(self):
         '''Scales the canvas so that all the objects on it are visible.'''
         bbox = self.getBBox()
         bboxstring = str(bbox.x-10)+" "+str(bbox.y-10)+" "+str(bbox.width+20)+" "+str(bbox.height+20)
         self.attrs["viewBox"] = bboxstring
+        self.scaleFactor = self.getScaleFactor()
         #self.attrs["preserveAspectRatio"] = "none"
+
+    def getScaleFactor(self):
+        bcr = self.getBoundingClientRect()
+        vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
+        self <= RectangleObject([(vbleft, vbtop), (vbleft+vbwidth, vbtop+vbheight)], 0, "red", 1, None)
+        return max(vbwidth/bcr.width, vbheight/bcr.height)
 
     def getSVGcoords(self, event):
         '''Converts mouse event coordinates to SVG coordinates'''
+        x = event.changedTouches[0].clientX if "touch" in event.type else event.clientX
+        y = event.changedTouches[0].clientY if "touch" in event.type else event.clientY
         pt = self.createSVGPoint()
-        (pt.x, pt.y) = (event.clientX, event.clientY)
+        (pt.x, pt.y) = (x, y)
         SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
         return Point((SVGpt.x, SVGpt.y))
 
@@ -1039,16 +1117,16 @@ class CanvasObject(svg.svg):
         using canvas.ObjectDict[id]. This is also needed for the object to be capable of being snapped to.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
         If it is not desired that an object should be in the ObjectDict, just add it to the canvas using Brython's <= method.'''
-        def AddToDict(svgobj):
+        def AddToDict(svgobj, fixed):
             if not svgobj.id: svgobj.id = "id"+str(len(self.ObjectDict))
             self.ObjectDict[svgobj.id] = svgobj
             svgobj.Fixed = fixed
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.ObjectList:
-                    AddToDict(obj)
+                    AddToDict(obj, fixed)
         if objid: svgobject.id = objid
         self <= svgobject
-        AddToDict(svgobject)
+        AddToDict(svgobject, fixed)
         svgobject.Canvas = self
         return svgobject
 
@@ -1097,11 +1175,40 @@ class CanvasObject(svg.svg):
     def onDragStart(self, event):
         event.preventDefault()
 
-    def onLeftDown(self, event):
+    def onTouchStart(self, event):
+        event.preventDefault()
+        global lasttaptime
+        latesttaptime = time.time()
+        if latesttaptime - lasttaptime < 0.3:
+            for function in self.events("dblclick"):
+                function(event)
+        else:
+            self.onLeftDown(event)
+        lasttaptime = latesttaptime
+
+    def onMouseDown(self, event):
         if event.button > 0: return
-        if self.MouseMode == MouseMode.TRANSFORM:
-            if self.MouseTransformType == TransformType.NONE or event.target.id not in self.ObjectDict: return
-            self.prepareMouseTransform(event)
+        self.onLeftDown(event)
+
+    def onLeftDown(self, event):
+        #print(event.target.id, type(event.target.id), len(event.target.id))
+        #event.preventDefault()
+        if self.MouseMode == MouseMode.DRAG:
+            self.MouseOwner = self.getSelectedObject(event.target.id)
+            if not self.MouseOwner or self.MouseOwner.Fixed: return
+            self.StartPoint = self.getSVGcoords(event)
+            self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+            self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+            #print("start", self.startx, self.starty)
+            #global tt
+            #tt = time.time()
+        elif self.MouseMode == MouseMode.TRANSFORM:
+            svgobj = self.getSelectedObject(event.target.id)
+            if svgobj:
+                self.showTransformHandles(svgobj)
+                self.transformHandles[1].Select(event)
+            else:
+                self.hideTransformHandles()
 
         elif self.MouseMode == MouseMode.DRAW:
             if self.MouseOwner:
@@ -1120,19 +1227,62 @@ class CanvasObject(svg.svg):
                     self.DeSelectShape()
 
     def onMouseMove(self, event):
-        if self.MouseMode == MouseMode.TRANSFORM:
-            if not self.MouseOwner or self.MouseTransformType == TransformType.NONE: return
-            self.doMouseTransform(event)
+        global tt
+        event.preventDefault()
+        if self.MouseMode == MouseMode.DRAG:
+            if not self.MouseOwner: return
+            x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+            y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+            #dx, dy = x-self.currentx, y-self.currenty
+            #if abs(dx) < 5 and abs(dy) < 5: return
+            #self.currentx, self.currenty = x, y
+            #tt = time.time()
+            dx, dy = (x-self.startx)*self.scaleFactor, (y-self.starty)*self.scaleFactor
+            self.MouseOwner.attrs["transform"] = "translate({},{})".format(dx, dy)
+            if isinstance(self.MouseOwner, [EllipseObject, RectangleObject]):
+                self.MouseOwner.attrs["transform"] += self.MouseOwner.rotatestring
+        #elif self.MouseMode == MouseMode.TRANSFORM:
+            #if not self.MouseOwner or self.MouseTransformType == TransformType.NONE: return
+            #self.doMouseTransform(event)
+            #print(x,y,self.MouseOwner.style.transform,time.time()-tt)
+        elif self.MouseMode == MouseMode.EDIT:
+            if not self.MouseOwner: return
+            x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+            y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+            dx, dy = x-self.currentx, y-self.currenty
+            if "touch" in event.type and abs(dx) < 5 and abs(dy) < 5: return
+            self.currentx, self.currenty = x, y
+            tt = time.time()
+            dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
+            #print(dx,dy)
+            self.MouseOwner.movePoint((dx, dy))
         else:
             if self.MouseOwner:
                 coords = self.getSVGcoords(event)
                 self.MouseOwner.movePoint(coords)
 
     def onLeftUp(self, event):
-        if event.button > 0: return
-        if self.MouseMode == MouseMode.TRANSFORM:
-            if self.MouseTransformType == TransformType.NONE: return
+        tt = time.time()
+        if event.type == "mouseup" and event.button > 0: return
+        if self.MouseMode == MouseMode.DRAG:
+            self.LastMouseOwner = self.MouseOwner
+            if not self.MouseOwner: return
+            self.MouseOwner.attrs["transform"] = ""
+            currentcoords = self.getSVGcoords(event)
+            offset = currentcoords - self.StartPoint
+            self.MouseOwner.translate(offset)
+            if self.Snap:
+                if self.RotateSnap: self.doRotateSnap(self.MouseOwner)
+                else: self.doSnap(self.MouseOwner)
+            self.MouseOwner = None
+        elif self.MouseMode == MouseMode.TRANSFORM:
+            if not isinstance(self.MouseOwner, TransformHandle):
+                self.MouseOwner = None
+                return
+            self.MouseOwner.owner.attrs["transform"] = ""
+            self.doMouseTransform(event)
             self.endMouseTransform(event)
+            #print(event.type, time.time()-tt)
         elif self.MouseMode == MouseMode.EDIT:
             try:
                 self.MouseOwner.onLeftUp()
@@ -1142,9 +1292,9 @@ class CanvasObject(svg.svg):
             self.MouseOwner = None
 
     def onDoubleClick(self,event):
-        if event.button > 0 or self.MouseMode != MouseMode.DRAW: return
+        if self.MouseMode != MouseMode.DRAW: return
         if self.MouseOwner:
-            if self.Tool in ["polygon", "polyline", "bezier", "closedbezier"]:
+            if mouseDetected and self.Tool in ["polygon", "polyline", "bezier", "closedbezier"]:
                 self.MouseOwner.DeletePoints(-2, None)
             self.LastMouseOwner = self.MouseOwner
             self.MouseOwner = None
@@ -1154,61 +1304,104 @@ class CanvasObject(svg.svg):
         self.AddObject(self.MouseOwner)
         self.MouseOwner.ShapeType = self.Tool
 
-    def prepareMouseTransform(self, event):
-        svgobj = self.ObjectDict[event.target.id]
-        if svgobj.Fixed: return
-        while getattr(svgobj, "Group", None):
-            svgobj = svgobj.Group
-        self <= svgobj
-        self.MouseOwner = svgobj
-        bbox = self.MouseOwner.getBBox()
-        (cx, cy) = self.MouseOwnerCentre = Point((bbox.x+bbox.width/2, bbox.y+bbox.height/2))
-        self.StartPoint = self.getSVGcoords(event)
+    def showTransformHandles(self, svgobj):
+        tempgroup = GroupObject([svgobj.cloneNode(True)])
+        self <= tempgroup
+        bbox = tempgroup.getBBox()
+        x1, y1, x2, y2 = bbox.x, bbox.y, bbox.x+bbox.width, bbox.y+bbox.height
+        delete(tempgroup)
+        svgobj.Centre = Point(((x1+x2)/2, (y1+y2)/2))
+        #self <= svgobj
+
+        self.transformBox.SetPoints([(x1,y1),(x2,y2)])
+        self <= self.transformBox
+        self.transformBox.style.visibility = "visible"
+        if not self.transformHandles: self.transformHandles = [self.transformBox] + [TransformHandle(None, i, (0,0), self) for i in range(1,6)]
+        for i, coords in enumerate([((x1+x2)/2,(y1+y2)/2), (x1,y1), (x2,(y1+y2)/2), ((x1+x2)/2,y2), (x2,y2)]):
+            self.transformHandles[i+1].XY = coords
+            self.transformHandles[i+1].owner = svgobj
+        for ttype in self.transformTypes:
+            thandle = self.transformHandles[ttype]
+            self <= thandle
+            thandle.style.visibility = "visible"
+        return [(x1,y1), (x2,y2)]
+
+    def hideTransformHandles(self):
+        for obj in self.transformHandles: obj.style.visibility = "hidden"
+
+    def getSelectedObject(self, objectid, getGroup = True):
+        try:
+            svgobj = self.ObjectDict[objectid]
+        except KeyError:
+            return
+        if getGroup:
+            while getattr(svgobj, "Group", None):
+                svgobj = svgobj.Group
+        return svgobj
+        #print(svgobj)
+        #self.transformhandle = TransformHandle(self.MouseOwner, 0, (x2,(y1+y2)/2))
+        #self <= self.transformhandle
+
+    def showTransformOrigin(self):
+        [(x1,y1), (x2,y2)] = self.transformBox.PointList
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         if self.MouseTransformType in [TransformType.NONE, TransformType.TRANSLATE]: return
         if self.MouseTransformType in [TransformType.ROTATE, TransformType.ENLARGE]:
-            self.TransformOrigin = PointObject(self.MouseOwnerCentre, colour="blue", pointsize=3)
+            self.TransformOrigin = PointObject((cx, cy), colour="blue", pointsize=3,canvas=self)
         elif self.MouseTransformType == TransformType.XSTRETCH:
-            self.TransformOrigin = LineObject([(cx, bbox.y), (cx, bbox.y+bbox.height)], linecolour="blue", linewidth=2)
+            self.TransformOrigin = LineObject([(cx,y1), (cx,y2)], linecolour="blue", linewidth=2)
         elif self.MouseTransformType == TransformType.YSTRETCH:
-            self.TransformOrigin = LineObject([(bbox.x, cy), (bbox.x+bbox.width, cy)], linecolour="blue", linewidth=2)
+            self.TransformOrigin = LineObject([(x1, cy), (x2, cy)], linecolour="blue", linewidth=2)
         self <= self.TransformOrigin
 
     def doMouseTransform(self, event):
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
         if offset.coords == [0, 0]: return
-        (cx, cy) = self.MouseOwnerCentre
-        vec1 = (x1, y1) = self.StartPoint - self.MouseOwnerCentre
-        vec2 = (x2, y2) = currentcoords - self.MouseOwnerCentre
-        self.StartPoint = currentcoords
+        currentobject = self.MouseOwner.owner
+        (cx, cy) = currentobject.Centre
+        vec1 = (x1, y1) = self.StartPoint - currentobject.Centre
+        vec2 = (x2, y2) = currentcoords - currentobject.Centre
+        #self.StartPoint = currentcoords
+
         if self.MouseTransformType == TransformType.TRANSLATE:
-            self.MouseOwner.translate(offset)
+            currentobject.translate(offset)
         elif self.MouseTransformType == TransformType.ROTATE:
-            self.MouseOwner.rotateByVectors(vec1, vec2, (cx, cy))
+            currentobject.rotateByVectors(vec1, vec2, (cx, cy))
         elif self.MouseTransformType == TransformType.XSTRETCH:
-            self.MouseOwner.xstretch(x2/x1, cx)
+            currentobject.xstretch(x2/x1, cx)
         elif self.MouseTransformType == TransformType.YSTRETCH:
-            self.MouseOwner.ystretch(y2/y1, cy)
+            currentobject.ystretch(y2/y1, cy)
         elif self.MouseTransformType == TransformType.ENLARGE:
-            self.MouseOwner.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
+            currentobject.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
 
     def endMouseTransform(self, event):
         if self.TransformOrigin:
             delete(self.TransformOrigin)
             self.TransformOrigin = None
-        if getattr(self.MouseOwner, "PointList", None) and self.Snap:
-            if self.RotateSnap: self.doRotateSnap()
-            else: self.doSnap()
-        self.LastMouseOwner = self.MouseOwner
+        if self.Snap:
+            if self.RotateSnap: self.doRotateSnap(self.MouseOwner.owner)
+            else: self.doSnap(self.MouseOwner.owner)
+        self.showTransformHandles(self.MouseOwner.owner)
+        self.setMouseTransformType(TransformType.NONE)
+        #self.LastMouseOwner = self.MouseOwner
         self.MouseOwner = None
 
-    def doRotateSnap(self):
+    def doRotateSnap(self, svgobject):
+        tt = time.time()
+        if not hasattr(svgobject, "PointList"): return
+        bbox = svgobject.getBBox()
+        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
         for objid in self.ObjectDict:
-            if objid == self.MouseOwner.id: continue
-            if not getattr(self.ObjectDict[objid], "PointList", None): continue
-            for point1 in self.ObjectDict[objid].PointList:
-                for point2 in self.MouseOwner.PointList:
+            if objid == svgobject.id: continue
+            obj = self.ObjectDict[objid]
+            if not hasattr(obj, "PointList"): continue
+            bbox = obj.getBBox()
+            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+            if L1-R > self.Snap or R1-L < -self.Snap or T1-B > self.Snap or B1-T < -self.Snap: continue
+            for point1 in obj.PointList:
+                for point2 in svgobject.PointList:
                     (dx, dy) = point1 - point2
                     if abs(dx) < self.Snap and abs(dy) < self.Snap:
                         pl1 = self.ObjectDict[objid].PointList
@@ -1217,7 +1410,7 @@ class CanvasObject(svg.svg):
                         vec1a = pl1[(i+1)%L] - point1
                         vec1b = pl1[(i-1)%L] - point1
                         angles1 = [vec1a.angle(), vec1b.angle()]
-                        pl2 = self.MouseOwner.PointList
+                        pl2 = svgobject.PointList
                         L = len(pl2)
                         j = pl2.index(point2)
                         vec2a = pl2[(j+1)%L] - point2
@@ -1232,32 +1425,47 @@ class CanvasObject(svg.svg):
 
                                 if testdiff < self.RotateSnap*pi/180:
                                     #print (pl1[i], pl2[j], g1, g2, diff)
-                                    self.MouseOwner.rotate(diff*180/pi)
+                                    svgobject.rotate(diff*180/pi)
                                     #print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
-                                    (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
+                                    (dx, dy) = self.ObjectDict[objid].PointList[i] - svgobject.PointList[j]
                                     #print (dx, dy)
-                                    self.MouseOwner.translate((dx, dy))
+                                    svgobject.translate((dx, dy))
+                                    print("rotatesnap", time.time()-tt)
                                     return
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
         if bestdx:
-            self.MouseOwner.translate((bestdx, bestdy))
+            svgobject.translate((bestdx, bestdy))
+        print("rotatesnap", time.time()-tt)
 
-    def doSnap(self):
+    def doSnap(self, svgobject):
+        tt = time.time()
+        if not hasattr(svgobject, "PointList"): return
+        bbox = svgobject.getBBox()
+        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
         for objid in self.ObjectDict:
-            if objid == self.MouseOwner.id: continue
-            if not getattr(self.ObjectDict[objid], "PointList", None): continue
-            for point1 in self.ObjectDict[objid].PointList:
-                for point2 in self.MouseOwner.PointList:
+            if objid == svgobject.id: continue
+            obj = self.ObjectDict[objid]
+            if not hasattr(obj, "PointList"): continue
+            bbox = obj.getBBox()
+            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+            if L1-R > self.Snap or R1-L < -self.Snap or T1-B > self.Snap or B1-T < -self.Snap: continue
+            #print("close")
+            for point1 in obj.PointList:
+                for point2 in svgobject.PointList:
                     (dx, dy) = point1 - point2
+                    #print(point1.coords, point2.coords, dx, dy)
                     if abs(dx) < self.Snap and abs(dy) < self.Snap:
+                        #print("within range")
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy):
+                            #print("setting as best")
                             #print ("point1", point1)
                             #print ("point2", point2)
                             #print (dx, dy)
                             (bestdx, bestdy) = (dx, dy)
-        if bestdx:
-            self.MouseOwner.translate((bestdx, bestdy))
+        if bestdx or bestdy:
+            svgobject.translate((bestdx, bestdy))
+        print("snap", time.time()-tt)
 
     def DeSelectShape(self):
         if self.SelectedShape:
@@ -1280,44 +1488,63 @@ class CanvasObject(svg.svg):
                 self.SelectedShape = None
 
 class Handle(PointObject):
-    def __init__(self, owner, index, coords):
-        PointObject.__init__(self, coords, "red", 5)
+    def __init__(self, owner, index, coords, canvas):
+        pointsize = 5 if mouseDetected else 20
+        opacity = 1 if mouseDetected else 0
+        PointObject.__init__(self, coords, "red", pointsize, canvas)
+        self.style.fillOpacity = opacity
         self.owner = owner
         self.index = index
         self.bind("mousedown", self.Select)
+        self.bind("touchstart", self.Select)
 
     def Select(self, event):
         event.stopPropagation()
+        self.owner.Canvas.startx = self.owner.Canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+        self.owner.Canvas.starty = self.owner.Canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         if self.owner.Canvas.MouseOwner == None:
             self.owner.Canvas.MouseOwner = self
 
-    def movePoint(self, coords):
-        offset = coords - self.XY
-        self.XY = coords
+    #def movePoint(self, coords):
+    def movePoint(self, offset):
+        #offset = coords - self.XY
+        #self.XY = coords
+        #print(offset, type(offset))
+        self.XY += offset
         if isinstance(self.owner, BezierMixin):
             pointset = [None, self.XY, None]
             for ch in self.owner.ControlHandles[self.index]:
-                ch.XY = ch.XY + offset
+                ch.XY += offset
                 pointset[ch.subindex] = ch.XY
+            #print("movePoint", time.time()-tt)
             self.owner.SetPointset(self.index, pointset)
         else:
             self.owner.SetPoint(self.index, self.XY)
 
 class ControlHandle(PointObject):
-    def __init__(self, owner, index, subindex, coords):
-        PointObject.__init__(self, coords, "green", 5)
+    def __init__(self, owner, index, subindex, coords, canvas):
+        pointsize = 5 if mouseDetected else 20
+        opacity = 1 if mouseDetected else 0
+        PointObject.__init__(self, coords, "green", pointsize, canvas)
+        self.style.fillOpacity = opacity
         self.owner = owner
         self.index = index
         self.subindex = subindex
         self.bind("mousedown", self.Select)
+        self.bind("touchstart", self.Select)
 
     def Select(self, event):
         event.stopPropagation()
+        self.owner.Canvas.startx = self.owner.Canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+        self.owner.Canvas.starty = self.owner.Canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         if self.owner.Canvas.MouseOwner == None:
             self.owner.Canvas.MouseOwner = self
 
-    def movePoint(self, newcoords):
-        self.XY = newcoords
+    #def movePoint(self, newcoords):
+    def movePoint(self, offset):
+        #self.XY = newcoords
+        self.XY += offset
+        newcoords = self.XY
 
         pointset = list(self.owner.PointsetList[self.index])
         if isinstance(self.owner, SmoothBezierMixin) and None not in pointset:
@@ -1330,7 +1557,81 @@ class ControlHandle(PointObject):
             otherindex = 0 if self.subindex==2 else 1
             self.owner.ControlHandles[self.index][otherindex].XY = newothercoords
         pointset[self.subindex] = newcoords
+        #print("movecontrolPoint", time.time()-tt)
         self.owner.SetPointset(self.index, tuple(pointset))
+
+class TransformHandle(PointObject):
+    def __init__(self, owner, transformtype, coords, canvas):
+        pointsize = 5 if mouseDetected else 15
+        opacity = 1 if mouseDetected else 0.2
+        strokewidth = 1 if mouseDetected else 3
+        PointObject.__init__(self, coords, "red", pointsize, canvas)
+        self.style.fillOpacity = opacity
+        self.style.strokeWidth = strokewidth
+        self.owner = owner
+        self.transformtype = transformtype
+        self.bind("mousedown", self.Select)
+        self.bind("touchstart", self.Select)
+
+    def Select(self, event):
+        event.stopPropagation()
+        if self.owner.Canvas.MouseOwner == None:
+            self.owner.Canvas.MouseOwner = self
+            self.owner.Canvas.StartPoint = self.owner.Canvas.getSVGcoords(event)
+            self.owner.Canvas.setMouseTransformType(self.transformtype)
+            self.owner.Canvas.hideTransformHandles()
+            self.style.visibility = "visible"
+            self.owner.Canvas.showTransformOrigin()
+
+    def movePoint(self, coords):
+        (dx, dy) = coords - self.owner.Canvas.StartPoint
+        #currentcoords = self.getSVGcoords(event)
+        #offset = currentcoords - self.StartPoint
+        if (dx, dy) == (0, 0): return
+        (cx, cy) = self.owner.Centre
+        vec1 = (x1, y1) = self.owner.Canvas.StartPoint - self.owner.Centre
+        vec2 = (x2, y2) = coords - self.owner.Centre
+        (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
+        angle = atan2(y3, x3)*180/pi
+        #print("Angle ", angle)
+        self.XY = coords
+        #self.StartPoint = currentcoords
+        if self.owner.Canvas.MouseTransformType == TransformType.TRANSLATE:
+            transformstring = "translate({},{})".format(dx, dy)
+        elif self.owner.Canvas.MouseTransformType == TransformType.ROTATE:
+            transformstring = "rotate({},{},{})".format(angle,cx,cy)
+            #self.owner.Canvas.bboxgroup.rotateByVectors(vec1, vec2, (cx, cy))
+            #self.owner.rotateByVectors(vec1, vec2, (cx, cy))
+        elif self.owner.Canvas.MouseTransformType == TransformType.XSTRETCH:
+            #if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
+                #self.owner.xstretch((x2/x1)/self.stretchfactor, cx)
+                #self.stretchfactor = x2/x1
+            #else:
+            xfactor = x2/x1
+            yfactor = xfactor if isinstance(self.owner, CircleObject) else 1
+            transformstring = "translate({},{}) scale({},{}) translate({},{})".format(cx, cy, xfactor, yfactor, -cx, -cy)
+            #self.owner.Canvas.bboxgroup.xstretch(x2/x1, cx)
+            #self.owner.xstretch(x2/x1, cx)
+        elif self.owner.Canvas.MouseTransformType == TransformType.YSTRETCH:
+            yfactor = y2/y1
+            xfactor = yfactor if isinstance(self.owner, CircleObject) else 1
+            transformstring = "translate({},{}) scale({},{}) translate({},{})".format(cx, cy, xfactor, yfactor, -cx, -cy)
+            #self.owner.Canvas.bboxgroup.ystretch(y2/y1, cy)
+            #self.owner.ystretch(y2/y1, cy)
+        elif self.owner.Canvas.MouseTransformType == TransformType.ENLARGE:
+            transformstring = "translate({},{}) scale({}) translate({},{})".format(cx, cy, hypot(x2, y2)/hypot(x1, y1), -cx, -cy)
+            #self.owner.Canvas.bboxgroup.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
+            #self.owner.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
+        if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
+            if self.owner.Canvas.MouseTransformType == TransformType.TRANSLATE:
+                self.owner.attrs["transform"] = transformstring + self.owner.rotatestring
+            else:
+                self.owner.attrs["transform"] = self.owner.rotatestring + transformstring
+        else:
+            self.owner.attrs["transform"] = transformstring
+        #self.owner.Canvas.bboxgroup.attrs["transform"] = transformstring
+        #if isinstance(self.owner, [EllipseObject, RectangleObject]):
+        #    self.owner.attrs["transform"] += self.owner.rotatestring
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''
@@ -1390,7 +1691,8 @@ class Point(object):
         return len(self.coords)
 
     def length(self):
-        return (sum(xi*xi for xi in self.coords))**0.5
+        (x, y) = self.coords
+        return hypot(x, y)
 
     def angle(self):
         return atan2(self.coords[1], self.coords[0])

@@ -1,7 +1,8 @@
 from browser import document
 import brySVG as SVG
+import time
 
-def onRightClick(event):
+def onDoubleClick(event):
     event.preventDefault()
     if event.target.id and event.target.id != "fixed":
         canvas.ObjectDict[event.target.id].rotate(90)
@@ -9,8 +10,11 @@ def onRightClick(event):
         canvas.ObjectDict[event.target.id].style.fill = colours[result]
 
 def checkposition(event):
-    if event.button > 1 or not canvas.LastMouseOwner: return
+    event.preventDefault()
+    if (event.type == "mouseup" and event.button > 1) or not canvas.LastMouseOwner: return
+    tt = time.time()
     result = canvas.LastMouseOwner.positionRelativeTo(fixedshape)
+    print("position", time.time()-tt)
     canvas.LastMouseOwner.style.fill = colours[result]
 
 fixedshape = SVG.PolygonObject([(0,20), (40,60), (60,30), (80,60), (100,20), (110,40), (140,40), (120,60), (140,75), (120,90), (140,105), (120,120), (0,120)], fillcolour="white")
@@ -24,7 +28,8 @@ document["demo8"] <= canvas
 canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
 canvas.Snap = 7
 canvas.bind("mouseup", checkposition)
-canvas.bind("contextmenu", onRightClick)
+canvas.bind("touchend", checkposition)
+canvas.bind("dblclick", onDoubleClick)
 
 canvas.AddObject(fixedshape, objid="fixed", fixed=True)
 for points in shapes:

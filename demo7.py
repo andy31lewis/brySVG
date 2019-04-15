@@ -5,19 +5,22 @@ from itertools import cycle
 def transformMode():
     if canvas.SelectedShape: canvas.DeSelectShape()
     canvas.MouseMode = SVG.MouseMode.TRANSFORM
-    canvas.setMouseTransformType(SVG.TransformType.ROTATE)
-    
+    print("transform mode")
+
 def editMode():
-        canvas.MouseMode = SVG.MouseMode.EDIT
-        canvas.style.cursor = "auto"
-    
-def onRightClick(event):
+    canvas.hideTransformHandles()
+    canvas.MouseMode = SVG.MouseMode.EDIT
+    canvas.style.cursor = "auto"
+    print("edit mode")
+
+def onDoubleClick(event):
+    print("double click")
     event.preventDefault()
     next(modecycle)()
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo7"] <= canvas
-canvas.bind("contextmenu", onRightClick)
+canvas.bind("dblclick", onDoubleClick)
 
 tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (50,0), (200,50))]),
         SVG.GroupObject([SVG.PolygonObject([(50,25), (0,50), (50,75), (100,50)]),
@@ -29,7 +32,7 @@ tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (5
         SVG.GroupObject([SVG.SmoothClosedBezierObject([(50,5), (5,80), (95,80)]),
                          SVG.PolylineObject([(0,0), (30,50), (70,50), (100,0)], linewidth=5)])
         ]
-        
+
 for i, tile in enumerate(tiles):
     canvas.AddObject(tile)
     tile.translate((i*100, i*100))

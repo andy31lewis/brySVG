@@ -1,7 +1,12 @@
 from browser import document
+import time
+print("Starting")
+tt = time.time()
 import brySVG as SVG
+#import SVGobjects2 as SVG
+print(time.time()-tt)
 
-def onRightClick(event):
+def onDoubleClick(event):
     event.preventDefault()
     if event.target.id: canvas.ObjectDict[event.target.id].rotate(45)
 
@@ -11,9 +16,9 @@ data = [[[(0,0), (50, 50), (100,0)], 45, 0], [[(0,0), (50, 50), (100,0)], 45, 80
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo3"] <= canvas
-canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
+canvas.MouseMode = SVG.MouseMode.DRAG
 canvas.Snap = 10
-canvas.bind("contextmenu", onRightClick)
+canvas.bind("dblclick", onDoubleClick)
 
 for points, angle, offset in data:
     piece = SVG.PolygonObject(points)

@@ -1,18 +1,12 @@
 from browser import document
 import brySVG as SVG
-from itertools import cycle
-
-def onRightClick(event):
-    event.preventDefault()
-    canvas.setMouseTransformType(next(transformtoggle))
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan", id="canvas1")
 document["demo4"] <= canvas
-transformtoggle = cycle((SVG.TransformType.TRANSLATE, SVG.TransformType.ROTATE))
-canvas.setMouseTransformType(next(transformtoggle))
+canvas.MouseMode = SVG.MouseMode.TRANSFORM
+canvas.transformTypes = [SVG.TransformType.TRANSLATE, SVG.TransformType.ROTATE]
 canvas.Snap = 15
 canvas.RotateSnap = 20
-canvas.bind("contextmenu", onRightClick)
 
 for n,m in [(12, 3), (8, 4), (6, 6)]:
     for i in range(n):
