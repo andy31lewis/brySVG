@@ -16,7 +16,6 @@ data = [[[(0,0), (50, 50), (100,0)], 45, 0], [[(0,0), (50, 50), (100,0)], 45, 80
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo3"] <= canvas
-canvas.MouseMode = SVG.MouseMode.DRAG
 canvas.Snap = 10
 canvas.bind("dblclick", onDoubleClick)
 
@@ -28,3 +27,4 @@ for points, angle, offset in data:
 
 canvas.AddObject(SVG.PolygonObject([(180, 100), (280,100), (280,200), (180,200)], fillcolour=None))
 canvas.fitContents()
+canvas.setMouseMode(SVG.MouseMode.DRAG)
