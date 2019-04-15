@@ -1,11 +1,20 @@
 from browser import document
-import time
-tt = time.time()
-import drawcanvas as SVG
-print(time.time()-tt)
+import fullcanvas as SVG
+from itertools import cycle
+
+def transformMode():
+    canvas.mouseMode = SVG.MouseMode.TRANSFORM
+
+def editMode():
+    canvas.mouseMode = SVG.MouseMode.EDIT
+
+def onDoubleClick(event):
+    event.preventDefault()
+    next(modecycle)()
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo6"] <= canvas
+canvas.bind("dblclick", onDoubleClick)
 
 tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (50,0), (200,50))]),
         SVG.GroupObject([SVG.ClosedBezierObject(pointlist=[(50,25), (0,50), (50,75), (100,50)]),
@@ -20,6 +29,7 @@ tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (5
 
 for i, tile in enumerate(tiles):
     canvas.addObject(tile)
-    canvas.translateObject(tile, (i*100, i*100))
+    tile.translate((i*100, i*100))
 canvas.fitContents()
-canvas.mouseMode = SVG.MouseMode.EDIT
+modecycle = cycle((transformMode, editMode))
+next(modecycle)()

@@ -1,12 +1,8 @@
 from browser import document
-import time
-print("Starting")
-tt = time.time()
 import transformcanvas as SVG
-print(time.time()-tt)
 
 poly = SVG.RegularPolygon(6, startpoint=(0, 20), sidelength=40, offsetangle=0)
-canvas = SVG.CanvasObject("98vw", "90vh", "cyan", id="canvas1")
+canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo4"] <= canvas
 canvas.mouseMode = SVG.MouseMode.TRANSFORM
 canvas.transformTypes = [SVG.TransformType.TRANSLATE, SVG.TransformType.ROTATE]

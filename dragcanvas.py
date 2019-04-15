@@ -9,7 +9,7 @@
 # MA 02111-1307 USA                                                           #
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
-import time
+#import time
 from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
@@ -28,7 +28,7 @@ MouseMode = Enum('MouseMode', 'NONE DRAG TRANSFORM DRAW EDIT')
 TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
-class TransformMixin(object):
+class ObjectMixin(object):
     '''In MouseMode.DRAG, this just provides the cloneObject method for all svgobjects'''
 
     def cloneObject(self):
@@ -89,9 +89,9 @@ class SmoothBezierMixin(BezierMixin):
         c2 = ((c2x+x2)/2, (c2y+y2)/2)
         return (Point(c1), Point(c2))
 
-class LineObject(svg.line, TransformMixin, NonBezierMixin):
+class LineObject(svg.line, ObjectMixin, NonBezierMixin):
     '''A wrapper for SVG line.'''
-    def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None):
+    def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none"):
         [(x1, y1), (x2, y2)] = pointlist
 
         if style == "faintdash1":
@@ -130,8 +130,10 @@ class TextObject(svg.text):
             horizpos = "middle"
         else:
             horizpos = "start"
-        if ignorescaling and canvas and "viewBox" in canvas.attrs:
-            fontsize = fontsize*canvas.scaleFactor
+        lineheight = fontsize*1.2
+        if ignorescaling and canvas:
+            fontsize *= canvas.scaleFactor
+            lineheight *= canvas.scaleFactor
         if anchorposition in [1, 2, 3]:
             yoffset = fontsize
         elif anchorposition in [4, 5, 6]:
@@ -140,17 +142,18 @@ class TextObject(svg.text):
             yoffset = fontsize*(1-rowcount)
 
         svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos)
-        #canvas <= self
         for s in stringlist[1:]:
-            self <= svg.tspan(s, x=x, dy=fontsize)
+            self <= svg.tspan(s, x=x, dy=lineheight)
 
 class WrappingTextObject(svg.text):
     '''See TextObject above for explanation of most of the parameters; however, note that canvas must be specified.
     A width in SVG units is also specified, and text will be wrapped at word boundaries to fit that width.'''
     def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False):
         (x, y) = anchorpoint
-        if ignorescaling and "viewBox" in canvas.attrs:
-            fontsize = fontsize*canvas.scaleFactor
+        lineheight = fontsize*1.2
+        if ignorescaling:
+            fontsize *= canvas.scaleFactor
+            lineheight *= canvas.scaleFactor
         words = string.split()
         svg.text.__init__(self, "", x=x, font_size=fontsize)
         canvas <= self
@@ -161,7 +164,7 @@ class WrappingTextObject(svg.text):
             tspan.text += " "+word
             if tspan.getComputedTextLength() > width:
                 tspan.text = tspan.text[:-len(word)-1]
-                tspan = svg.tspan(word, x=x, dy=fontsize)
+                tspan = svg.tspan(word, x=x, dy=lineheight)
                 self <= tspan
                 rowcount += 1
 
@@ -180,10 +183,10 @@ class WrappingTextObject(svg.text):
             yoffset = fontsize*(1-rowcount)
         self.attrs["y"] = y+yoffset
 
-class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixin):
+class PolylineObject(svg.polyline, ObjectMixin, NonBezierMixin, PolyshapeMixin):
     '''Wrapper for SVG polyline. Parameter:
     pointlist: a list of coordinates for the vertices'''
-    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour=None):
+    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none"):
         svg.polyline.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.update()
@@ -191,7 +194,7 @@ class PolylineObject(svg.polyline, TransformMixin, NonBezierMixin, PolyshapeMixi
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
-class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin):
+class PolygonObject(svg.polygon, ObjectMixin, NonBezierMixin, PolyshapeMixin):
     '''Wrapper for SVG polygon. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
@@ -202,7 +205,7 @@ class PolygonObject(svg.polygon, TransformMixin, NonBezierMixin, PolyshapeMixin)
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
-class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
+class RectangleObject(svg.rect, ObjectMixin, NonBezierMixin):
     '''Wrapper for SVG rect.  Parameters:
     pointlist: a list of coordinates for two opposite vertices
     angle: an optional angle of rotation (clockwise, in degrees).'''
@@ -214,7 +217,6 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
-        #print((x1, y1), (x2, y2))
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
@@ -223,13 +225,12 @@ class RectangleObject(svg.rect, TransformMixin, NonBezierMixin):
 
         basepointlist = self.transformedpointlist(t.matrix.inverse())
         [(x1, y1), (x2, y2)] = basepointlist
-        #print((x1, y1), (x2, y2))
         self.attrs["x"] = x2 if x2<x1 else x1
         self.attrs["y"] = y2 if y2<y1 else y1
         self.attrs["width"] = abs(x2-x1)
         self.attrs["height"] = abs(y2-y1)
 
-class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
+class EllipseObject(svg.ellipse, ObjectMixin, NonBezierMixin):
     '''Wrapper for SVG ellipse.  Parameters:
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
     and an optional angle of rotation (clockwise, in degrees).'''
@@ -254,7 +255,7 @@ class EllipseObject(svg.ellipse, TransformMixin, NonBezierMixin):
         self.attrs["rx"]=abs(x2-x1)/2
         self.attrs["ry"]=abs(y2-y1)/2
 
-class CircleObject(svg.circle, TransformMixin, NonBezierMixin):
+class CircleObject(svg.circle, ObjectMixin, NonBezierMixin):
     '''Wrapper for SVG circle. Parameters:
     EITHER  centre and radius,
     OR pointlist: a list of two points: the centre, and any point on the circumference.'''
@@ -273,14 +274,14 @@ class CircleObject(svg.circle, TransformMixin, NonBezierMixin):
         self.attrs["cy"]=y1
         self.attrs["r"]=hypot(x2-x1, y2-y1)
 
-class BezierObject(svg.path, BezierMixin, TransformMixin):
+class BezierObject(svg.path, BezierMixin, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
     (previous-control-point, vertex, next-control-point).
     For the first vertex, the previous-control-point must be None,
     and for the last vertex, the next-control-point must be None.'''
-    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
+    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none"):
         def toPoint(coords):
             return None if coords is None else Point(coords)
         svg.path.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
@@ -312,7 +313,7 @@ class BezierObject(svg.path, BezierMixin, TransformMixin):
         self.plist = ["M", x1, y1, "C", c1x, c1y]+[x for p in self.pointsetList[1:-1] for c in p for x in c]+[c2x, c2y, x2, y2]
         self.attrs["d"] = " ".join(str(x) for x in self.plist)
 
-class ClosedBezierObject(svg.path, BezierMixin, TransformMixin):
+class ClosedBezierObject(svg.path, BezierMixin, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
@@ -352,7 +353,7 @@ class SmoothBezierObject(SmoothBezierMixin, BezierObject):
     '''Wrapper for svg path element.  Parameter:
     pointlist: a list of vertices.
     Control points will be calculated automatically so that the curve is smooth at each vertex.'''
-    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None):
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none"):
         self.pointList = [Point(coords) for coords in pointlist]
         pointsetlist = self.getpointsetlist(self.pointList)
         BezierObject.__init__(self, pointsetlist, linecolour=linecolour, linewidth=linewidth, fillcolour=fillcolour)
@@ -403,7 +404,7 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
                 (c1, c2) = self.calculatecontrolpoints(pointlist[j-1:j+2])
                 self.pointsetList[j%L] = (c1, pointlist[j], c2)
 
-class PointObject(svg.circle, TransformMixin):
+class PointObject(svg.circle, ObjectMixin):
     '''A point (small circle) on a diagram. Parameters:
     XY: the coordinates of the point,
     pointsize: (optional) the radius of the point.'''
@@ -447,7 +448,7 @@ class RegularPolygon(PolygonObject):
             self.pointList.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
         PolygonObject.__init__(self, self.pointList, linecolour, linewidth, fillcolour)
 
-class GroupObject(svg.g, TransformMixin):
+class GroupObject(svg.g, ObjectMixin):
     '''Wrapper for SVG g element. Parameters:
     objlist: list of the objects to include in the group
     id: (optional) id to identify the element in the DOM'''
@@ -589,9 +590,8 @@ class CanvasObject(svg.svg):
     def __init__(self, width, height, colour="white", objid=None):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
         if objid: self.id = objid
-        self.objectDict = {} # See above .
+        self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
-        #self._mouseMode = None
         self.mouseMode = MouseMode.DRAG
         self.transformTypes = TransformType
         self.snap = None
@@ -600,11 +600,13 @@ class CanvasObject(svg.svg):
         self.penColour = "black"
         self.fillColour  = "yellow"
         self.penWidth = 3
+
         #Attributes intended to be read-only for users
         self.scaleFactor = 1 #Multiply by this to convert CSS pixels to SVG units
         self.mouseDetected = False #If false, indicates a touchscreen device
         self.mouseOwner = None #The object (shape or handle) durrently being dragged
         self.selectedObject = None #The shape which was last clicked on or dragged
+
         #Attributes not intended to be used by end-users
         self.objectDict = {}
         self.hittargets = []
@@ -613,7 +615,7 @@ class CanvasObject(svg.svg):
         self.transformHandles = []
         self.selectedhandle = None
         self.transformorigin = None
-        self.transformBBox = RectangleObject(linecolour="blue", fillcolour=None)
+        self.transformBBox = RectangleObject(linecolour="blue", fillcolour="none")
         self.bind("mousedown", self.onMouseDown)
         self.bind("mousemove", self.onMouseMove)
         self.bind("mouseup", self.onLeftUp)
@@ -644,7 +646,6 @@ class CanvasObject(svg.svg):
         '''Recalculates self.scaleFactor. Call this after zooming in or out of the canvas.'''
         bcr = self.getBoundingClientRect()
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
-        self <= RectangleObject([(vbleft, vbtop), (vbleft+vbwidth, vbtop+vbheight)], 0, "red", 1, None)
         return max(vbwidth/bcr.width, vbheight/bcr.height)
 
     def getSVGcoords(self, event):
@@ -835,6 +836,7 @@ class CanvasObject(svg.svg):
     def prepareDrag(self, event):
         self.mouseOwner = self.selectedObject = self.getSelectedObject(event.target.id)
         if not self.mouseOwner or self.mouseOwner.fixed: return
+        self <= self.mouseOwner
         self.StartPoint = self.getSVGcoords(event)
         self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -853,7 +855,6 @@ class CanvasObject(svg.svg):
         offset = currentcoords - self.StartPoint
         tt = time.time()
         self.translateObject(self.mouseOwner, offset)
-        #print(time.time()-tt)
         if self.snap:
             if self.rotateSnap: self.doRotateSnap(self.mouseOwner)
             else: self.doSnap(self.mouseOwner)
@@ -874,7 +875,6 @@ class CanvasObject(svg.svg):
         return svgobj
 
     def doSnap(self, svgobject):
-        #tt = time.time()
         if not hasattr(svgobject, "pointList"): return
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
@@ -894,7 +894,6 @@ class CanvasObject(svg.svg):
                             (bestdx, bestdy) = (dx, dy)
         if bestdx or bestdy:
             self.translateObject(svgobject, Point((bestdx, bestdy)))
-        #print("snap", time.time()-tt)
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''

@@ -1,29 +1,19 @@
 from browser import document
-import time
-print("Starting")
-tt = time.time()
-import transformcanvas as SVG
-print(time.time()-tt)
+import dragcanvas as SVG
 
+data = [[[(0,0), (50,50), (100,0)], 0], [[(0,50), (50, 0), (50,100)], 80], [[(0,0), (0,50), (50,50)], 160],
+[[(0,25), (25,0), (50,25)], 210], [[(0,0), (25, 25), (0,50)], 270], [[(25,0), (50, 25), (25, 50), (0,25)], 310],
+[[(0,0), (25, 25), (75,25), (50,0)], 360]]
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo2"] <= canvas
+canvas.snap = 10
 
-tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (50,0), (200,50))]),
-        SVG.GroupObject([SVG.PolygonObject([(50,25), (0,50), (50,75), (100,50)]),
-                         SVG.SmoothBezierObject([(100,0), (4,40), (4,60), (100,100)])]),
-        SVG.EllipseObject([(25,0), (75,100)], 30),
-        SVG.GroupObject([SVG.CircleObject((50,50), 50),
-                         SVG.BezierObject([(None, (0,100), (50,25)), ((50,25), (100,100), None)])]),
-        SVG.RectangleObject([(40,0), (50,90)], 20),
-        SVG.GroupObject([SVG.SmoothClosedBezierObject([(50,5), (5,80), (95,80)]),
-                         SVG.PolylineObject([(0,0), (30,50), (70,50), (100,0)])])
-        ]
+for points, offset in data:
+    piece = SVG.PolygonObject(points)
+    canvas.addObject(piece)
+    canvas.translateObject(piece, (offset, 0))
 
-for i, tile in enumerate(tiles):
-    canvas.addObject(tile)
-    tile.translate((i*100, i*100))
+canvas.addObject(SVG.PolygonObject([(180, 100), (280,100), (280,200), (180,200)], fillcolour="none"), fixed=True)
 canvas.fitContents()
-canvas.mouseMode = SVG.MouseMode.TRANSFORM
-print("finished", time.time()-tt)
-
+canvas.mouseMode = SVG.MouseMode.DRAG

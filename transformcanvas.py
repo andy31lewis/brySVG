@@ -93,7 +93,6 @@ class TransformMixin(object):
             t = svgbase.createSVGTransform()
             t.setTranslate(*vector)
             self.matrixTransform(t.matrix)
-        #print (time.time()-tt)
 
     def rotate(self, angle, centre=None):
         '''Rotate object clockwise by angle degrees around centre.
@@ -123,7 +122,6 @@ class TransformMixin(object):
             (x2, y2) = vec2
             (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
             angle = atan2(y3, x3)*180/pi
-            #print("Final angle", angle)
             if isinstance(self, (EllipseObject, RectangleObject)):
                 self.angle += angle
             matrix = svgbase.createSVGMatrix()
@@ -184,9 +182,9 @@ class TransformMixin(object):
 
 class TransformCanvasMixin(object):
     def prepareTransform(self, event):
-        #self.mouseDetected = True if "mouse" in event.type else False
         self.selectedObject = self.getSelectedObject(event.target.id)
         if self.selectedObject and not self.selectedObject.fixed:
+            self <= self.selectedObject
             self.showTransformHandles(self.selectedObject)
             if TransformType.TRANSLATE in self.transformTypes: self.transformHandles[TransformType.TRANSLATE].select(event)
         else:
@@ -222,7 +220,6 @@ class TransformCanvasMixin(object):
             self.deleteObject(self.transformorigin)
             self.transformorigin = None
         self.showTransformHandles(self.selectedObject)
-        #self.setMouseTransformType(TransformType.NONE)
         self.mouseOwner = None
 
     def showTransformHandles(self, svgobj):
@@ -232,7 +229,6 @@ class TransformCanvasMixin(object):
         x1, y1, x2, y2 = bbox.x, bbox.y, bbox.x+bbox.width, bbox.y+bbox.height
         self.deleteObject(tempgroup)
         svgobj.Centre = Point(((x1+x2)/2, (y1+y2)/2))
-        #self <= svgobj
 
         self.transformBBox.pointList = [Point((x1,y1)),Point((x2,y2))]
         self.transformBBox.update()
@@ -270,16 +266,12 @@ class TransformCanvasMixin(object):
         if "touch" in event.type and abs(dx) < 5 and abs(dy) < 5: return
         self.currentx, self.currenty = x, y
         if self.mouseMode == MouseMode.DRAW:
-            #tt = time.time()
             coords = self.getSVGcoords(event)
             self.mouseOwner.movePoint(coords)
-           #print(time.time()-tt)
         else:
             if self.mouseMode == MouseMode.TRANSFORM: dx, dy = x-self.startx, y-self.starty
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
-            #tt = time.time()
             self.mouseOwner.movePoint((dx, dy))
-            #print(time.time()-tt)
 
     def doRotateSnap(self, svgobject):
         tt = time.time()
@@ -310,7 +302,6 @@ class TransformCanvasMixin(object):
                         vec2a = pl2[(j+1)%L] - point2
                         vec2b = pl2[(j-1)%L] - point2
                         angles2 = [vec2a.angle(), vec2b.angle()]
-                        #print (angles1, angles2)
                         for a1 in angles1:
                             for a2 in angles2:
                                 diff = a1-a2
@@ -318,17 +309,13 @@ class TransformCanvasMixin(object):
                                 testdiff = absdiff if absdiff < pi else 2*pi-absdiff
 
                                 if testdiff < self.rotateSnap*pi/180:
-                                    #print (pl1[i], pl2[j], g1, g2, diff)
                                     svgobject.rotate(diff*180/pi)
                                     (dx, dy) = self.objectDict[objid].pointList[i] - svgobject.pointList[j]
-                                    #print (dx, dy)
                                     svgobject.translate((dx, dy))
-                                    #print("rotatesnap", time.time()-tt)
                                     return
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
         if bestdx:
             svgobject.translate((bestdx, bestdy))
-        #print("rotatesnap", time.time()-tt)
 
 class TransformHandle(PointObject):
     def __init__(self, owner, transformtype, coords, canvas):
@@ -346,12 +333,10 @@ class TransformHandle(PointObject):
 
     def select(self, event):
         event.stopPropagation()
-        #if self.canvas.mouseOwner == None:
         self.canvas.mouseOwner = self
         self.startx, self.starty = self.canvas.StartPoint = self.canvas.getSVGcoords(event)
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
-        #self.canvas.setMouseTransformType(self.transformType)
         self.canvas.hideTransformHandles()
         if self.transformType != TransformType.TRANSLATE: self.style.visibility = "visible"
         self.canvas.showTransformOrigin(self.transformType)
@@ -362,7 +347,6 @@ class TransformHandle(PointObject):
         (x, y) = self.startx + dx, self.starty + dy
         self.XY = (x, y)
         if self.transformType == TransformType.TRANSLATE:
-            #self.style.visibility = "hidden"
             transformstring = "translate({},{})".format(dx, dy)
             if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
                 self.owner.attrs["transform"] = transformstring + self.owner.rotatestring

@@ -20,7 +20,6 @@ class NonBezierMixin(object):
 
     def setPoints(self, pointlist):
         self.pointList = pointlist
-        #print("set points")
         self.update()
 
     def movePoint(self, coords):
@@ -61,7 +60,6 @@ class BezierMixin(object):
     def appendPoint(self, point):
         self.pointList.append(point)
         self.pointsetList = self.getpointsetlist(self.pointList)
-        #print(len(self.pointsetList))
         self.update()
 
     def deletePoints(self, start, end):
@@ -86,7 +84,6 @@ class BezierMixin(object):
             ((x7,x8),(x9,x10),dummy) = self.pointsetList[-1]
             self.plist = self.plist[:-10]+[x1,x2,x3,x4,x5,x6,x7,x8,x9,x10]
             self.attrs["d"] = " ".join(str(x) for x in self.plist)
-        #print(self.plist)
 
 class DrawCanvasMixin(object):
     def createObject(self, coords):
@@ -102,7 +99,6 @@ class DrawCanvasMixin(object):
                 coords = self.getSVGcoords(event)
                 self.mouseOwner.appendPoint(coords)
         else:
-            #self.mouseDetected = True if "mouse" in event.type else False
             self.startx = self.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = self.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
             coords = self.getSVGcoords(event)
@@ -116,22 +112,16 @@ class DrawCanvasMixin(object):
         self.mouseMode = MouseMode.EDIT
 
     def prepareEdit(self, event):
-        #if self.tool != "select": return
-        #self.mouseDetected = True if "mouse" in event.type else False
         if self.selectedObject: self.deselectObject()
         svgobject = self.getSelectedObject(event.target.id, getGroup=False)
-        #print("last object", self.selectedObject)
         if not svgobject or svgobject.fixed: return
         self.selectedObject = svgobject
-        #print("this object", self.selectedObject)
         if isinstance(svgobject, BezierMixin):
-            #print("is Bezier")
             handles = []
             controlhandles = []
             for i, (point0, point1, point2) in enumerate(svgobject.pointsetList):
                 handle = Handle(svgobject, i, point1, self)
                 handle.controlHandles = []
-                #print("handle", i, "adding control handles")
                 ch0 = None if point0 is None else ControlHandle(svgobject, i, 0, point0, self)
                 ch2 = None if point2 is None else ControlHandle(svgobject, i, 2, point2, self)
                 if ch0:
@@ -156,16 +146,12 @@ class DrawCanvasMixin(object):
         if "touch" in event.type and abs(dx) < 5 and abs(dy) < 5: return
         self.currentx, self.currenty = x, y
         if self.mouseMode == MouseMode.DRAW:
-            #tt = time.time()
             coords = self.getSVGcoords(event)
             self.mouseOwner.movePoint(coords)
-           #print(time.time()-tt)
         else:
             if self.mouseMode == MouseMode.TRANSFORM: dx, dy = x-self.startx, y-self.starty
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
-            #tt = time.time()
             self.mouseOwner.movePoint((dx, dy))
-            #print(time.time()-tt)
 
     def endEdit(self, event):
         hittarget = getattr(self.selectedObject, "hitTarget", None)
@@ -186,10 +172,11 @@ class DrawCanvasMixin(object):
 
 class Handle(PointObject):
     def __init__(self, owner, index, coords, canvas):
-        pointsize = 7 if canvas.mouseDetected else 20
-        opacity = 1 if canvas.mouseDetected else 0
+        pointsize = 7 if canvas.mouseDetected else 15
+        opacity = 1 if canvas.mouseDetected else 0.2
+        strokewidth = 1 if canvas.mouseDetected else 3
         PointObject.__init__(self, coords, "red", pointsize, canvas)
-        #self.style.strokeWidth = 2
+        self.style.strokeWidth = strokewidth
         self.style.fillOpacity = opacity
         self.owner = owner
         self.index = index
@@ -201,7 +188,6 @@ class Handle(PointObject):
         event.stopPropagation()
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
-        #if self.canvas.mouseOwner == None: self.canvas.mouseOwner = self
         self.canvas.mouseOwner = self
         if isinstance(self.owner, BezierMixin):
             if self.canvas.selectedhandle:
@@ -222,10 +208,12 @@ class Handle(PointObject):
 
 class ControlHandle(PointObject):
     def __init__(self, owner, index, subindex, coords, canvas):
-        pointsize = 7 if canvas.mouseDetected else 20
-        opacity = 1 if canvas.mouseDetected else 0
+        pointsize = 7 if canvas.mouseDetected else 15
+        opacity = 1 if canvas.mouseDetected else 0.2
+        strokewidth = 1 if canvas.mouseDetected else 3
         PointObject.__init__(self, coords, "green", pointsize, canvas)
         self.style.fillOpacity = opacity
+        self.style.strokeWidth = strokewidth
         self.style.visibility = "hidden"
         self.owner = owner
         self.index = index
@@ -235,11 +223,9 @@ class ControlHandle(PointObject):
         self.bind("touchstart", self.select)
 
     def select(self, event):
-        #print(event.type)
         event.stopPropagation()
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
-        #if self.canvas.mouseOwner == None: self.canvas.mouseOwner = self
         self.canvas.mouseOwner = self
 
     def movePoint(self, offset):
@@ -254,7 +240,6 @@ class ControlHandle(PointObject):
             newothercoords = point-newoffset
             pointset[self.linkedHandle.subindex] = newothercoords
             self.linkedHandle.XY = newothercoords
-        #print("movecontrolPoint", time.time()-tt)
         self.owner.setPointset(self.index, tuple(pointset))
 
 class LineObject(LineObject, NonBezierMixin):
