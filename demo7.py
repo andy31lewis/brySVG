@@ -7,6 +7,7 @@ def checkposition(event):
     if (event.type == "mouseup" and event.button > 1) or not canvas.selectedObject or canvas.selectedObject.fixed: return
     result = relativeposition(canvas.selectedObject, fixedshape)
     canvas.selectedObject.style.fill = colours[result]
+    #print(canvas.selectedObject.pointList[0], containspoint(fixedshape, canvas.selectedObject.pointList[0]))
 
 fixedshape = SVG.PolygonObject([(0,20), (40,60), (60,30), (80,60), (100,20), (110,40), (140,40), (120,60), (140,75), (120,90), (140,105), (120,120), (0,120)], fillcolour="white")
 shapes = ([(190,30), (240,60), (260,40), (280,60), (290,30), (300,60), (330,60), (320,87.5), (330,95), (330,140), (190,140)],

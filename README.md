@@ -8,7 +8,7 @@
 - More consistent API; all methods now follow the DOM convention of camelCase eg `canvas.addObject(obj)`
 - `Button`, `ImageButton`, (multiline) `TextObject`, and `WrappingTextObject` added.
 
-##Introduction
+## Introduction
 
 This module provides classes for simplifying the use of SVG graphics in Brython projects.
 
@@ -17,14 +17,18 @@ dragcanvas.py
 drawcanvas.py  
 transformcanvas.py  
 fullcanvas.py  
-positiontesting.py
+polygontesting.py
 
 Then just include an `import` statement in your brython file:  
 `import dragcanvas as SVG` if only MouseMode.DRAG is required  
-`import transformcanvas as SVG` if only MouseMode.TRANSFORM is required (also allows MouseMode.DRAG)  
-`import drawcanvas as SVG` if only MouseMode.DRAW and MouseMode.EDIT are required (also allows MouseMode.DRAG)  
+`import transformcanvas as SVG` if MouseMode.TRANSFORM is required (also allows MouseMode.DRAG)  
+`import drawcanvas as SVG` if MouseMode.DRAW and MouseMode.EDIT are required (also allows MouseMode.DRAG)  
 `import fullcanvas as SVG` if all four MouseModes are required  
 (See below for description of the different modes.)
+
+You can add extra functionality for polygons by including, in addition to one of the above:  
+`from polygontesting import *`  
+See the section **Polygon Testing** below for details of these functions.
 
 Description of some of the classes:
 
@@ -41,21 +45,21 @@ Wrapper for SVG svg element.
 
 ### Methods  
 `setDimensions()`:
-If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes. Returns a tuple (width, height).
+If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes. Returns a tuple `(width, height)`.
 
 `fitContents()`:
 Scales the canvas so that all the objects on it are visible.
 
 `getScaleFactor()`
-Recalculates `self.scaleFactor` (which is used for converting css pixels to the SVG units of this canvas). This is called automatically by fitContents(), but should be called manually after zooming in or out of the canvas in some other way.
+Recalculates `self.scaleFactor` (which is used for converting css pixels to the SVG units of this canvas). This is called automatically by `fitContents()`, but should be called manually after zooming in or out of the canvas in some other way.
 
 `getSVGcoords(event)`:
-Converts mouse event coordinates to SVG coordinates. Returns a Point object.
+Converts mouse event coordinates to SVG coordinates. Returns a `Point` object.
 
 `addObject(svgobject, objid=None, fixed=False)`:  
 Adds an object to the canvas, and also adds it to the canvas's `objectDict` so that it can be referenced using `canvas.objectDict[id]`. This is also needed for the object to be capable of being *snapped* to.  If the object should not be capable of being dragged or transformed with mouse actions, set `fixed` to True.  
 (Note that referencing using `document[id]` will only give the SVG element, not the Python object.)   
-If it is not desired that an object should be in the `objectDict`, just add it to the canvas using Brython's <= method.
+If it is not desired that an object should be in the `objectDict`, just add it to the canvas using Brython's `<=` method.
 
 `deleteObject(svgobject)`
 Delete an object from the canvas.  
@@ -91,16 +95,10 @@ The CanvasObject also has various attributes which affect how mouse interaction 
 ### PolygonObject, PolyLineObject
 
 `PolygonObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
-`PolylineObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
+`PolylineObject(pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none")`  
 Wrappers for SVG polygon and polyline.  
 Parameter:  
 `pointlist`: a list of coordinates for the vertices.
-
-**Methods**  
-`PolygonObjects` have the following extra methods:  
-`area()`: returns the area of the polygon.  
-`isEqual(other)`: returns `True` if `other` is identical, otherwise `False`.  
-`positionRelativeTo(other)`: returns one of `Position.CONTAINS`, `Position.INSIDE`, `Position.OVERLAPS`, `Position.DISJOINT` or `Position.EQUAL`, showing the polygon's position relative to `other`, which is another `PolygonObject`.
 
 ### RectangleObject, EllipseObject
 
@@ -123,14 +121,14 @@ Parameters:
 **or** `pointlist`: a list of two points - the centre of the circle and any point on the circumference.  
 (If both are given, the `pointlist` takes priority.)
 
-`LineObject(pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour=None)`  
+`LineObject(pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none")`  
 Parameters:  
 `pointlist`: the two endpoints of the line.  
 `style`: Either `"solid"`, `"faintdash1"` or `"faintdash2"` (the last two are for use when drawing graph paper).
 
 ### Bezier Objects
 
-`BezierObject(pointsetlist=[(None, (0,0), (0,0)), ((0,0), (0,0), None)], linecolour="black", linewidth=1, fillcolour=None)`  
+`BezierObject(pointsetlist=[(None, (0,0), (0,0)), ((0,0), (0,0), None)], linecolour="black", linewidth=1, fillcolour="none")`  
 A general Bezier curve. Parameter:  
 `pointsetlist`: a list of tuples, each tuple consisting of three points: `(previous-control-point, vertex, next-control-point)`.  
 The control points control the curvature of the curve at that vertex.
@@ -141,12 +139,12 @@ and for the last vertex, the `next-control-point` must be `None`.
 A closed general Bezier curve (the first vertex does not need to be repeated). Parameter:  
 `pointsetlist`: a list of tuples, each tuple consisting of three points: `(previous-control-point, vertex, next-control-point)`.
 
-`SmoothBezierObject(pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour=None)`  
+`SmoothBezierObject(pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none")`  
 A smooth Bezier curve. Parameter:  
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
 `SmoothClosedBezierObject(pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow")`  
-A closed smooth Bezier curve (the first vertex does not need to be repeated).  Parameter:
+A closed smooth Bezier curve (the first vertex does not need to be repeated).  Parameter:  
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
 ### Regular polygons
@@ -160,7 +158,7 @@ Parameters:
 
 ### Common methods for shape objects
 
-These can be applied to all the shapes above.
+These can be applied to all the shapes above. Apart from `cloneObject()`, which is always available, the methods in this section are only available if the module has been imported using `import transformcanvas as SVG` or `import fullcanvas as SVG`.
 
 `cloneObject()`: Returns a clone of an object, including the extra functionality provided by this module. (NB If that functionality is not needed, it is better to call the DOM method `cloneNode(object)` on the CanvasObject, as that is much faster.)
 
@@ -186,12 +184,12 @@ Objects can be dragged around on the canvas.
 `canvas.selectedObject` is the shape which was lasted dragged.
 
 `canvas.snap`: set to a number of pixels. After a drag, if a vertex of the transformed object is within this many pixels of a vertex of another object in the canvas's objectDict, the dragged object is snapped so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.  
-If canvas.snap is set to None (the default), no snapping will be done.
+If `canvas.snap` is set to `None` (the default), no snapping will be done.
 
 ### canvas.mouseMode = MouseMode.TRANSFORM
 
 Objects can be dragged around on the canvas.  In addition, clicking on an object shows a bounding box and a number of handles (which ones can be controlled by setting `canvas.transformTypes` to the list of transforms required. By default, `canvas.transformTypes` includes:  
-`[TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]`
+`[TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]`  
 `canvas.selectedObject` is the shape curently being transformed.
 
 `canvas.rotateSnap`: set to a number of degrees. After a transform, if a snap is to be done, and the edges of the two shapes at the vertex to be snapped are within this many degrees of each other, the transformed shape will be rotated so that the edges coincide.  
@@ -216,7 +214,7 @@ No user interaction with the canvas.
 
 ## Other Objects
 
-###TextObjects
+### TextObjects
 
 `TextObject(string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None)`  
 A multiline textbox.  Use `"\n"` within `string` to separate lines. To make sure the font-size is not affected by the scaling of the canvas, set `ignorescaling` to `True`, and specify the `canvas` on which the object will be placed.  
@@ -237,6 +235,36 @@ A clickable button with (multiline) `text` on it(use `\n` for line breaks). If `
 
 `ImageButton(position, size, image, onclick, fillcolour="lightgrey", canvas=None, objid=None)`  
 A clickable button with an SVG image on it. The centre of the image should be at (0,0). If the `canvas` is specified, the image will be scaled to fit inside the button. The onclick parameter is the function which handles the event.
+
+## Polygon testing
+
+Including `from polygontesting import *` provides the following additional functions. `poly`, `poly1`, `poly2` are `PolygonObjects`, `point` is a `PointObject`.
+
+`polygonobjectarea(poly)`  
+Returns the area of the PolygonObject.
+
+`equalpolygonobjects(poly1, poly2)`  
+Returns True if poly1 is identical to poly2, False otherwise.
+
+`containspoint(poly, point)`  
+Returns "interior" if point is inside the polygon, "edge" if it is on an edge,  "vertex" if it is at a vertex, or False otherwise.
+`dp` is the precision to which the coordinates of the vertices are used.
+
+`relativeposition(poly1, poly2, dp=1)`  
+Returns an Enum value: `Position.CONTAINS`, `Position.INSIDE`, `Position.OVERLAPS`, `Position.DISJOINT` or `Position.EQUAL` which describes the position of poly1 relative to poly2.  
+`dp` is the precision to which the coordinates of the vertices are used.
+
+`polygonobjectboundingbox(poly)`  
+Returns the coordinates of the top left and bottom right vertices of the bounding box of the PolygonObject.
+
+(Note that this module also provides versions of these functions for which the parameter `point` is just a tuple giving the coordinates, and `poly`, `poly1`, and `poly2` are just lists of tuples. Thus the module can be used **independently of brySVG** if required.  In this case the functions are:
+
+`polygonarea(poly)`  
+`equalpolygons(poly1, poly2)`  
+`containspoint(poly, point)`  
+`relativeposition(poly1, poly2, dp=1)`  
+`polygonboundingbox(poly)` )
+
 
 
 

@@ -19,15 +19,21 @@ class Enum(list):
 
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
-def containspoint(polygonobject, point):
-    '''Returns "interior" if point is inside the polygon, "edge" if it is on an edge, or False otherwise'''
-    (x, y) = point
-    pointlist = polygonobject.pointList
-    length = len(pointList)
+def containspoint(poly, point, dp=1):
+    '''Returns "interior" if point is inside the polygon, "edge" if it is on an edge,
+    "vertex" if it is at a vertex, or False otherwise.
+    dp is the precision to which the coordinates of the vertices are used.'''
+    poly = getattr(poly, "pointList", poly)
+    poly = [(round(x,dp), round(y,dp)) for (x, y) in poly]
+    point = getattr(point, "XY", point)
+    (x, y) = (round(point[0],dp), round(point[1],dp))
+    if (x, y) in poly: return "vertex"
+    length = len(poly)
     counter = 0
-    (x1, y1) = pointList[0]
+    (x1, y1) = poly[0]
     for i in range(1, length+1):
-        (x2, y2) = pointList[i%length]
+        (x2, y2) = poly[i%length]
+        if x1 == x2 == x and min(y1,y2)<=y<=max(y1,y2): return "edge"
         if y1 == y2:
             if y == y1 and min(x1,x2)<=x<=max(x1,x2): return "edge"
         elif min(y1,y2)<y<=max(y1,y2) and x<max(x1, x2):
@@ -52,8 +58,7 @@ def polygonarea(poly):
     return abs(area/2)
 
 def equalpolygonobjects(poly1, poly2):
-    '''Returns True if the polygon is identical to other, False otherwise.
-    other is another PolygonObject'''
+    '''Returns True if poly1 is identical to poly2, False otherwise.'''
     return equalpolygons(poly1.pointList, poly2.Pointlist)
 
 def equalpolygons(poly1, poly2):
@@ -66,9 +71,11 @@ def equalpolygons(poly1, poly2):
     return poly1 == poly2 or poly1 == poly2[::-1]
 
 def polygonobjectboundingbox(poly):
+    '''Returns the coordinates of the top left and bottom right vertices of the bounding box of poly.'''
     return polygonboundingbox(poly.pointList)
 
 def polygonboundingbox(poly):
+    '''Returns the coordinates of the top left and bottom right vertices of the bounding box of poly.'''
     xcoords = [x for (x,y) in poly]
     left = min(xcoords)
     right = max(xcoords)
@@ -79,7 +86,8 @@ def polygonboundingbox(poly):
 
 def relativeposition(poly1, poly2, dp=1):
     '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
-    other is another PolygonObject.'''
+    which describes the position of poly1 relative to poly2.
+    dp is the precision to which the coordinates of the vertices are used.'''
     ABOVE, BELOW, CONTAINS, ABOVEORCONTAINS, BELOWORCONTAINS = 0, 1, 2, 3, 4
     ENDING, ONGOING, STARTING = 0, 1, 2
     START, END = 0, 1
@@ -295,8 +303,10 @@ def relativeposition(poly1, poly2, dp=1):
         return currentoutcome #Checked all "inner" intervals
 
     dp1 = dp+2
-    poly1 = [(round(x,dp1), round(y,dp1)) for (x, y) in poly1.pointList]
-    poly2 = [(round(x,dp1), round(y,dp1)) for (x, y) in poly2.pointList]
+    poly1 = getattr(poly1, "pointList", poly1)
+    poly2 = getattr(poly2, "pointList", poly2)
+    poly1 = [(round(x,dp1), round(y,dp1)) for (x, y) in poly1]
+    poly2 = [(round(x,dp1), round(y,dp1)) for (x, y) in poly2]
     transposed = False
 
     bboxresult = compareboundingboxes(poly1, poly2)
