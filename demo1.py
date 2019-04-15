@@ -23,9 +23,10 @@ for i in range(10):
         canvas <= tile
         canvas.rotateElement(tile, 45*(i*6+j))
         canvas.translateElement(tile, (i*100, j*100))
-canvas.fitContents()
 
 multilinetext = "This is a\nmultiline\nTextObject\nwith anchor\nat top left\nand fontsize 16"
 canvas <= SVG.TextObject(multilinetext, (1025,10), 1, fontsize=16, ignorescaling=True, canvas=canvas)
 longtext = "This is a WrappingTextObject with a width of 200 SVG units, with the anchor at bottom left."
 canvas <= SVG.WrappingTextObject(canvas, longtext, (1025,600), 200, 7, 16, ignorescaling=True)
+canvas.fitContents()
+

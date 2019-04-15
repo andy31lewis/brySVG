@@ -114,7 +114,7 @@ class LineObject(svg.line, ObjectMixin, NonBezierMixin):
         self.attrs["y2"] = y2
 
 class TextObject(svg.text):
-    '''A multiline textbox.  Use "\n" to separate lines. To make sure the font-size is not affected by the scaling of the
+    '''A multiline textbox.  Use "\n" within string to separate lines. To make sure the font-size is not affected by the scaling of the
     canvas, set ignorescaling to True, and specify the canvas on which the object will be placed.
     The box is placed at the coordinates given by anchorpoint; the anchorposition can be from 1 to 9:
     1  2  3  ie if anchorposition is 1, the anchorpoint is top-left, if it is 5 it is in the centre of the box, etc
@@ -489,7 +489,7 @@ class GroupObject(svg.g, ObjectMixin):
 class Button(GroupObject):
     '''A clickable button with (multiline) text on it. If fontsize is not specified, the text will be scaled to fit
     the height (but not width) of the button. The onclick parameter is the function which handles the event.'''
-    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="yellow", objid=None):
+    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="lightgrey", objid=None):
         GroupObject.__init__(self)
         if objid: self.id = objid
         (x, y), (width, height) = position, size
@@ -514,7 +514,7 @@ class ImageButton(GroupObject):
     '''A clickable button with an SVG image on it. The centre of the image should be at (0,0).
     If the canvas is specified, the image will be scaled to fit inside the button.
     The onclick parameter is the function which handles the event.'''
-    def __init__(self, position, size, image, onclick, fillcolour="yellow", canvas=None, objid=None):
+    def __init__(self, position, size, image, onclick, fillcolour="lightgrey", canvas=None, objid=None):
         GroupObject.__init__(self)
         if objid: self.id = objid
         (x, y), (width, height) = position, size
@@ -551,18 +551,18 @@ class CanvasObject(svg.svg):
     After creation, there are various attributes which control how the canvas responds to mouse actions:
 
     canvas.mouseMode = MouseMode.DRAG
-        Objects can be dragged around on the canvas
+        Objects can be dragged around on the canvas.
+        canvas.snap: set to a number of pixels. After a drag, if a vertex of the transformed object is within
+            this many pixels of a vertex of another object in the canvas's objectDict, the transformed object is snapped
+            so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.
+            If canvas.snap is set to None (the default), no snapping will be done.
 
     canvas.mouseMode = MouseMode.TRANSFORM
         ***To enable this mode, use import transformcanvas or import fullcanvas instead of import dragcanvas***
         Objects can be dragged around on the canvas.  In addition, clicking on an object shows a bounding box
-        and a number of handles (which ones can be controlled by setting self.transformTypes to the list of transforms
-        required. By default, self transforms includes:
+        and a number of handles (which ones can be controlled by setting canvas.transformTypes to the list of transforms
+        required. By default, canvas.transformTypes includes:
         [TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]
-        canvas.snap: set to a number of pixels. After a transform, if a vertex of the transformed object is within
-            this many pixels of a vertex of another object in the canvas's objectDict, the transformed object is snapped
-            so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.
-            If canvas.snap is set to None (the default), no snapping will be done.
         canvas.rotateSnap: set to a number of degrees. After a transform, if a snap is to be done, and the edges
             of the two shapes at the vertex to be snapped are within this many degrees of each other,
             the transformed shape will be rotated so that the edges coincide.
@@ -643,7 +643,8 @@ class CanvasObject(svg.svg):
         #self.attrs["preserveAspectRatio"] = "none"
 
     def getScaleFactor(self):
-        '''Recalculates self.scaleFactor. Call this after zooming in or out of the canvas.'''
+        '''Recalculates self.scaleFactor. This is called automatically by fitContents(), but should be called manually
+         after zooming in or out of the canvas in some other way.'''
         bcr = self.getBoundingClientRect()
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
         return max(vbwidth/bcr.width, vbheight/bcr.height)
@@ -768,7 +769,7 @@ class CanvasObject(svg.svg):
                 if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
                 newobj = obj.cloneObject()
                 newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
-                newobj.style.opacity = 0.2
+                newobj.style.opacity = 0
                 newobj.reference = obj
                 obj.hitTarget = newobj
                 self.hittargets.append(newobj)
