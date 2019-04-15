@@ -498,7 +498,7 @@ class Button(GroupObject):
         rowcount = text.count("\n") + 1
         if not fontsize: fontsize = height*0.8/rowcount
         text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
-        self.addObjects([button, text], fixed=True)
+        self.addObjects([self.button, text], fixed=True)
         self.bind("mousedown", self.onMouseDown)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)

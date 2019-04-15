@@ -1,5 +1,8 @@
 from browser import document, html
+#import time
+#tt = time.time()
 import brywidgets as ws
+#print(time.time()-tt)
 
 class DemoPage(ws.NotebookPage):
     def update(self):
@@ -34,9 +37,9 @@ Drag the polygons around, matching edges as closely as possible. If the angle be
 the dragged polygon should rotate so that the edges coincide. Polygons can also be rotated by hand."""),
 html.P(html.B("Demo 5")+""" - This demonstrates ImageButtons, MouseMode.DRAW, and MouseMode.EDIT. Choose a type of shape.
 Click on the canvas, then move to start drawing a shape. Click again to create a new vertex.
-Double-click to finish the shape, and switch to MouseMode.EDIT."""+html.BR()+
+To finish the shape and switch to MouseMode.EDIT, either double-click on the canvas or tap on the "select" button (top left)"""+html.BR()+
 """Now clicking on a shape will display some (red) handles, which can be dragged to change the shape.
-Bezier shapes also have (green) control handles which change the curvature at a vertex.
+Clicking on a handle of a Bezier shape will display (green) control handles which control the curvature at that vertex.
 For a smooth Bezier shape, these will move as a pair."""),
 html.P(html.B("Demo 6")+""" - This demonstrates switching between MouseMode.TRANSFORM and MouseMode.EDIT.
 Double-clicking on the canvas will toggle between transforming the shapes (as in Demo 2)
