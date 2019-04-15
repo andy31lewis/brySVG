@@ -3,7 +3,7 @@ import brySVG as SVG
 from itertools import cycle
 
 def transformMode():
-    if canvas.SelectedShape: canvas.DeSelectShape()
+    if canvas.selectedObject: canvas.deselectObject()
     canvas.setMouseMode(SVG.MouseMode.TRANSFORM)
     print("transform mode")
 
@@ -14,7 +14,7 @@ def editMode():
     print("edit mode")
 
 def onDoubleClick(event):
-    print("double click")
+    print("double click", canvas.selectedObject)
     event.preventDefault()
     next(modecycle)()
 

@@ -11,11 +11,11 @@ def onDoubleClick(event):
 
 def checkposition(event):
     event.preventDefault()
-    if (event.type == "mouseup" and event.button > 1) or not canvas.LastMouseOwner: return
+    if (event.type == "mouseup" and event.button > 1) or not canvas.selectedObject: return
     tt = time.time()
-    result = canvas.LastMouseOwner.positionRelativeTo(fixedshape)
+    result = canvas.selectedObject.positionRelativeTo(fixedshape)
     print("position", time.time()-tt)
-    canvas.LastMouseOwner.style.fill = colours[result]
+    canvas.selectedObject.style.fill = colours[result]
 
 fixedshape = SVG.PolygonObject([(0,20), (40,60), (60,30), (80,60), (100,20), (110,40), (140,40), (120,60), (140,75), (120,90), (140,105), (120,120), (0,120)], fillcolour="white")
 shapes = ([(190,30), (240,60), (260,40), (280,60), (290,30), (300,60), (330,60), (320,87.5), (330,95), (330,140), (190,140)],
