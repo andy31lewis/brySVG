@@ -4,12 +4,12 @@ from itertools import cycle
 
 def transformMode():
     if canvas.SelectedShape: canvas.DeSelectShape()
-    canvas.MouseMode = SVG.MouseMode.TRANSFORM
+    canvas.setMouseMode(SVG.MouseMode.TRANSFORM)
     print("transform mode")
 
 def editMode():
     canvas.hideTransformHandles()
-    canvas.MouseMode = SVG.MouseMode.EDIT
+    canvas.setMouseMode(SVG.MouseMode.EDIT)
     canvas.style.cursor = "auto"
     print("edit mode")
 

@@ -25,6 +25,6 @@ for points, angle, offset in data:
     piece.rotate(angle)
     piece.translate((offset, 0))
 
-canvas.AddObject(SVG.PolygonObject([(180, 100), (280,100), (280,200), (180,200)], fillcolour=None))
+canvas.AddObject(SVG.PolygonObject([(180, 100), (280,100), (280,200), (180,200)], fillcolour=None), fixed=True)
 canvas.fitContents()
 canvas.setMouseMode(SVG.MouseMode.DRAG)

@@ -232,14 +232,6 @@ class NonBezierMixin(object):
     def movePoint(self, coords):
        self.SetPoint(-1, coords)
 
-    def SelectShape(self):
-        if self.Canvas.Tool != "select": return
-        if self.Canvas.SelectedShape:
-            self.Canvas.DeSelectShape()
-        self.Canvas.SelectedShape = self
-        self.Handles = GroupObject([Handle(self, i, coords, self.Canvas) for i, coords in enumerate(self.PointList)], "handles")
-        self.Canvas <= self.Handles
-
 class PolyshapeMixin(object):
     '''Methods for PolylineObject and PolygonObject.'''
     def AppendPoint(self, point):
@@ -261,24 +253,6 @@ class BezierMixin(object):
     def SetPointsets(self, pointsetlist):
         self.PointsetList = pointsetlist
         self.Update()
-
-    def SelectShape(self):
-        if self.Canvas.Tool != "select": return
-        if self.Canvas.SelectedShape:
-            self.Canvas.DeSelectShape()
-        self.Canvas.SelectedShape = self
-        pointlist = [pointset[1] for pointset in self.PointsetList]
-        self.Handles = GroupObject([Handle(self, i, coords, self.Canvas) for i, coords in enumerate(pointlist)], "handles")
-        self.Canvas <= self.Handles
-
-        controlhandles = []
-        for i, (point0, point1, point2) in enumerate(self.PointsetList):
-            if point0 is None: controlhandles.append((ControlHandle(self, i, 2, point2, self.Canvas), ))
-            elif point2 is None: controlhandles.append((ControlHandle(self, i, 0, point0, self.Canvas), ))
-            else: controlhandles.append((ControlHandle(self, i, 0, point0, self.Canvas), ControlHandle(self, i, 2, point2, self.Canvas)))
-        self.ControlHandles = controlhandles
-        self.ControlHandlesGroup = GroupObject([ch for chset in controlhandles for ch in chset], "controlhandles")
-        self.Canvas <= self.ControlHandlesGroup
 
 class SmoothBezierMixin(object):
     '''Methods for SmoothBezierObject and SmoothClosedBezierObject.'''
@@ -1048,8 +1022,8 @@ class CanvasObject(svg.svg):
         (For Bezier shapes there are also "control handles" to control the curvature.)
         In this mode, canvas.Tool will normally be set to "select".
         While a shape is selected, pressing the DEL key on the keyboard will delete the shape.
-        canvas.SelectedShape is the shape curently being edited.
-        Use canvas.DeSelectShape to stop editing a shape and hide the handles.
+        canvas.selectedObject is the shape curently being edited.
+        Use canvas.deselectObject to stop editing a shape and hide the handles.
 
     canvas.MouseMode = MouseMode.NONE
         No user interaction with the canvas.
@@ -1069,7 +1043,7 @@ class CanvasObject(svg.svg):
         self.setMouseTransformType(TransformType.NONE)
         self.MouseOwner = None
         self.LastMouseOwner = None
-        self.SelectedShape = None
+        self.selectedObject = None
         self.TransformOrigin = None
         self.transformBox = RectangleObject(linecolour="blue", fillcolour=None)
         self.transformHandles = []
@@ -1184,7 +1158,7 @@ class CanvasObject(svg.svg):
         if mm in [MouseMode.DRAG, MouseMode.EDIT, MouseMode.TRANSFORM]:
             for objid, obj in self.ObjectDict.items():
                 #if isinstance(obj, [LineObject, PolylineObject, BezierObject, SmoothBezierObject]):
-                if obj.style.fill == "none":
+                if obj.style.fill == "none" and not obj.Fixed:
                     newobj = obj.cloneObject()
                     newobj.style.strokeWidth = 10*self.scaleFactor if mouseDetected else 25*self.scaleFactor
                     newobj.style.opacity = 0.2
@@ -1251,10 +1225,10 @@ class CanvasObject(svg.svg):
         elif self.MouseMode == MouseMode.EDIT:
             svgobj = self.getSelectedObject(event.target.id, getGroup=False)
             if svgobj:
-                svgobj.SelectShape()
+                self.selectObject(svgobj)
             else:
-                if self.SelectedShape:
-                    self.DeSelectShape()
+                if self.selectedObject:
+                    self.deselectObject()
 
     def onMouseMove(self, event):
         global tt
@@ -1314,12 +1288,12 @@ class CanvasObject(svg.svg):
             self.endMouseTransform(event)
             #print(event.type, time.time()-tt)
         elif self.MouseMode == MouseMode.EDIT:
-            hittarget = getattr(self.SelectedShape, "hitTarget", None)
+            hittarget = getattr(self.selectedObject, "hitTarget", None)
             if hittarget:
-                if isinstance(self.SelectedShape, BezierMixin):
-                    hittarget.PointsetList = self.SelectedShape.PointsetList
+                if isinstance(self.selectedObject, BezierMixin):
+                    hittarget.PointsetList = self.selectedObject.PointsetList
                 else:
-                    hittarget.PointList = self.SelectedShape.PointList
+                    hittarget.PointList = self.selectedObject.PointList
                 hittarget.Update()
             self.LastMouseOwner = self.MouseOwner
             self.MouseOwner = None
@@ -1336,6 +1310,27 @@ class CanvasObject(svg.svg):
         self.MouseOwner = self.ShapeTypes[self.Tool](pointlist=[coords, coords], linecolour=self.PenColour, linewidth=self.PenWidth, fillcolour=self.FillColour)
         self.AddObject(self.MouseOwner)
         self.MouseOwner.ShapeType = self.Tool
+
+    def selectObject(self, svgobject):
+        if self.Tool != "select": return
+        if self.selectedObject: self.deselectObject()
+        self.selectedObject = svgobject
+        if isinstance(svgobject, BezierMixin):
+            pointlist = [pointset[1] for pointset in svgobject.PointsetList]
+            svgobject.Handles = GroupObject([Handle(svgobject, i, coords, self) for i, coords in enumerate(pointlist)], "handles")
+            self <= svgobject.Handles
+
+            controlhandles = []
+            for i, (point0, point1, point2) in enumerate(svgobject.PointsetList):
+                if point0 is None: controlhandles.append((ControlHandle(svgobject, i, 2, point2, self), ))
+                elif point2 is None: controlhandles.append((ControlHandle(svgobject, i, 0, point0, self), ))
+                else: controlhandles.append((ControlHandle(svgobject, i, 0, point0, self), ControlHandle(svgobject, i, 2, point2, self)))
+            svgobject.ControlHandles = controlhandles
+            svgobject.ControlHandlesGroup = GroupObject([ch for chset in controlhandles for ch in chset], "controlhandles")
+            self <= svgobject.ControlHandlesGroup
+        else:
+            svgobject.Handles = GroupObject([Handle(svgobject, i, coords, self) for i, coords in enumerate(svgobject.PointList)], "handles")
+            self <= svgobject.Handles
 
     def showTransformHandles(self, svgobj):
         tempgroup = GroupObject([svgobj.cloneNode(True)])
@@ -1504,24 +1499,24 @@ class CanvasObject(svg.svg):
             svgobject.translate((bestdx, bestdy))
         print("snap", time.time()-tt)
 
-    def DeSelectShape(self):
-        if self.SelectedShape:
-            self.deleteObject(self.SelectedShape.Handles)
-            if isinstance(self.SelectedShape, BezierMixin):
-                self.deleteObject(self.SelectedShape.ControlHandlesGroup)
-                del self.SelectedShape.ControlHandles
-            self.MouseOwner = self.SelectedShape = None
+    def deselectObject(self):
+        if self.selectedObject:
+            self.deleteObject(self.selectedObject.Handles)
+            if isinstance(self.selectedObject, BezierMixin):
+                self.deleteObject(self.selectedObject.ControlHandlesGroup)
+                delattr(self.selectedObject, "ControlHandles")
+            self.MouseOwner = self.selectedObject = None
 
     def DeleteSelection(self,event):
         #print (event.target, event.currentTarget)
         if event.keyCode == 46:
-            if self.SelectedShape:
-                self.deleteObject(self.SelectedShape.Handles)
-                if isinstance(self.SelectedShape, BezierMixin):
-                    self.deleteObject(self.SelectedShape.ControlHandlesGroup)
-                    del self.SelectedShape.ControlHandles
-                self.deleteObject(self.SelectedShape)
-                self.SelectedShape = None
+            if self.selectedObject:
+                self.deleteObject(self.selectedObject.Handles)
+                if isinstance(self.selectedObject, BezierMixin):
+                    self.deleteObject(self.selectedObject.ControlHandlesGroup)
+                    delattr(self.selectedObject, "ControlHandles")
+                self.deleteObject(self.selectedObject)
+                self.selectedObject = None
 
 class Handle(PointObject):
     def __init__(self, owner, index, coords, canvas):
