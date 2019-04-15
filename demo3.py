@@ -1,25 +1,23 @@
 from browser import document
-import brySVG as SVG
-
-def onRightClick(event):
-    event.preventDefault()
-    if event.target.id: canvas.ObjectDict[event.target.id].rotate(45)
-
-data = [[[(0,0), (50, 50), (100,0)], 45, 0], [[(0,0), (50, 50), (100,0)], 45, 80], [[(0,-20), (50, -20), (50, 30)], 0, 160],
-[[(0,0), (25, 25), (50,0)], 45, 210], [[(0,0), (25, 25), (50,0)], 45, 260], [[(25,0), (50, 25), (25, 50), (0,25)], 45, 310],
-[[(0,0), (25, 25), (75,25), (50,0)], 0, 360]]
+import transformcanvas as SVG
 
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo3"] <= canvas
-canvas.setMouseTransformType(SVG.TransformType.TRANSLATE)
-canvas.Snap = 10
-canvas.bind("contextmenu", onRightClick)
 
-for points, angle, offset in data:
-    piece = SVG.PolygonObject(points)
-    canvas.AddObject(piece)
-    piece.rotate(angle)
-    piece.translate((offset, 0))
+tiles = [SVG.ClosedBezierObject([((-100,50), (50,100), (200,50)), ((-100,50), (50,0), (200,50))]),
+        SVG.GroupObject([SVG.PolygonObject([(50,25), (0,50), (50,75), (100,50)]),
+                         SVG.SmoothBezierObject([(100,0), (4,40), (4,60), (100,100)])]),
+        SVG.EllipseObject([(25,0), (75,100)], 30),
+        SVG.GroupObject([SVG.CircleObject((50,50), 50),
+                         SVG.BezierObject([(None, (0,100), (50,25)), ((50,25), (100,100), None)])]),
+        SVG.RectangleObject([(40,0), (50,90)], 20),
+        SVG.GroupObject([SVG.SmoothClosedBezierObject([(50,5), (5,80), (95,80)]),
+                         SVG.PolylineObject([(0,0), (30,50), (70,50), (100,0)])])
+        ]
 
-canvas.AddObject(SVG.PolygonObject([(180, 100), (280,100), (280,200), (180,200)], fillcolour=None))
+for i, tile in enumerate(tiles):
+    canvas.addObject(tile)
+    tile.translate((i*100, i*100))
 canvas.fitContents()
+canvas.mouseMode = SVG.MouseMode.TRANSFORM
+

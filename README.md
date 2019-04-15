@@ -1,42 +1,72 @@
 # brySVG
 
-Classes for simplifying the use of SVG graphics in Brython projects.
+## New in version 0.2.0
 
-To use, download the zip, and move the brySVG folder into your own project folder.  Then just include `import brySVG` in your brython file.  
-(I use `import brySVG as SVG` to make references shorter.)
+- Support for touch screens, including larger, "finger-sized" handles and more touch-friendly selection of thin lines.  
+- Redesigned mouse transformations, now using handles on a bounding-box.  
+- The module is now split into several files, for faster imports if only a subset of the full functionality is needed.
+- More consistent API; all methods now follow the DOM convention of camelCase eg `canvas.addObject(obj)`
+- `Button`, `ImageButton`, (multiline) `TextObject`, and `WrappingTextObject` added.
+
+##Introduction
+
+This module provides classes for simplifying the use of SVG graphics in Brython projects.
+
+To use, download the zip, and move the following files into your own project folder:  
+dragcanvas.py  
+drawcanvas.py  
+transformcanvas.py  
+fullcanvas.py  
+positiontesting.py
+
+Then just include an `import` statement in your brython file:  
+`import dragcanvas as SVG` if only MouseMode.DRAG is required  
+`import transformcanvas as SVG` if only MouseMode.TRANSFORM is required (also allows MouseMode.DRAG)  
+`import drawcanvas as SVG` if only MouseMode.DRAW and MouseMode.EDIT are required (also allows MouseMode.DRAG)  
+`import fullcanvas as SVG` if all four MouseModes are required  
+(See below for description of the different modes.)
 
 Description of some of the classes:
 
 ## CanvasObject
 
-`CanvasObject(width, height, colour="white", id=None)`
+`CanvasObject(width, height, colour="white", objid=None)`
 
 Wrapper for SVG svg element.  
 
 **Parameters:**  
 `width, height`: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc.(To set the SVG attributes which are in pixels, call `canvas.setDimensions()` after creating the object.)  
 `colour`: the background colour  
-`id`: the DOM id
+`objid`: the DOM id
 
 ### Methods  
 `setDimensions()`:
-If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes.
-
-`AddObject(self, svgobject)`:  
-Adds an object to the canvas, and also adds it to the canvas's `ObjectDict` so that it can be referenced using `canvas.ObjectDict[id]`. This is also needed for the object to be capable of being *snapped* to.  
-(Note that referencing using `document[id]` will only give the SVG element, not the Python object.)   
-If it is not desired that an object should be in the `ObjectDict`, just add it to the canvas using Brython's <= method.
+If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes. Returns a tuple (width, height).
 
 `fitContents()`:
 Scales the canvas so that all the objects on it are visible.
 
-`ClearAll()`:
-Clear all elements from the canvas.
+`getScaleFactor()`
+Recalculates `self.scaleFactor` (which is used for converting css pixels to the SVG units of this canvas). This is called automatically by fitContents(), but should be called manually after zooming in or out of the canvas in some other way.
 
 `getSVGcoords(event)`:
-Converts mouse event coordinates to SVG coordinates.
+Converts mouse event coordinates to SVG coordinates. Returns a Point object.
 
-*(Note that the following three methods do not update the object's `PointList`, so that mouse interaction with the object will no longer work correctly.  If mouse interaction is needed, carry out transformations using the methods defined on the object itself (see __Common methods for shape objects__ below).  However, if mouse interaction is not needed, these methods are faster.)*
+`addObject(svgobject, objid=None, fixed=False)`:  
+Adds an object to the canvas, and also adds it to the canvas's `objectDict` so that it can be referenced using `canvas.objectDict[id]`. This is also needed for the object to be capable of being *snapped* to.  If the object should not be capable of being dragged or transformed with mouse actions, set `fixed` to True.  
+(Note that referencing using `document[id]` will only give the SVG element, not the Python object.)   
+If it is not desired that an object should be in the `objectDict`, just add it to the canvas using Brython's <= method.
+
+`deleteObject(svgobject)`
+Delete an object from the canvas.  
+
+`deleteAll()`
+Clear all elements from the canvas.
+
+`translateObject(svgobject, offset)`
+Translate an `svgobject` by `offset`.  Unlike `translateElement` (below), this will preserve the extra functionality provided by this module - ie the shape will still be able to be selected, dragged, etc.
+
+*(Note that the following three methods do not update the object's `PointList`, so that mouse interaction with the object will no longer work correctly.  If mouse interaction is needed, carry out transformations using the methods defined on the object itself (see __Common methods for shape objects__ below).  However, if mouse interaction is not needed, these methods are __faster__.)*
 
 `translateElement(element, vector)`:
 Translate `element` by `vector`.
@@ -150,34 +180,63 @@ These can be applied to all the shapes above.
 
 The `CanvasObject` has various attributes which control how it responds to mouse actions:
 
-### canvas.MouseMode = MouseMode.TRANSFORM
-In this mode, clicking on an object and dragging carries out the transformation which has been set using `canvas.setMouseTransformType()`.  This can be:  
-`TransformType.NONE, TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE`
+### canvas.mouseMode = MouseMode.DRAG
 
-`canvas.Snap`: To force "snapping", set this parameter to a number of pixels. After a transform, if a vertex of the transformed object is within `canvas.Snap` pixels of a vertex of another object in the canvas's ObjectDict, the transformed object is snapped so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.  
-If `canvas.Snap` is set to `None` (the default), no snapping will be done.
+Objects can be dragged around on the canvas.  
+`canvas.selectedObject` is the shape which was lasted dragged.
 
-`canvas.RotateSnap`: To allow rotation when "snapping", set this to a number of degrees. After a transform, if a snap is to be done, and the edges of the two shapes at the vertex to be snapped are within this many degrees of each other, the transformed shape will be rotated so that the edges coincide.  
-If `canvas.RotateSnap` is set to `None` (the default), no rotating will be done.  
-If `canvas.Snap` is set to `None`, the value of `canvas.RotateSnap` has no effect.
+`canvas.snap`: set to a number of pixels. After a drag, if a vertex of the transformed object is within this many pixels of a vertex of another object in the canvas's objectDict, the dragged object is snapped so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.  
+If canvas.snap is set to None (the default), no snapping will be done.
 
-### canvas.MouseMode = MouseMode.DRAW
+### canvas.mouseMode = MouseMode.TRANSFORM
+
+Objects can be dragged around on the canvas.  In addition, clicking on an object shows a bounding box and a number of handles (which ones can be controlled by setting `canvas.transformTypes` to the list of transforms required. By default, `canvas.transformTypes` includes:  
+`[TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]`
+`canvas.selectedObject` is the shape curently being transformed.
+
+`canvas.rotateSnap`: set to a number of degrees. After a transform, if a snap is to be done, and the edges of the two shapes at the vertex to be snapped are within this many degrees of each other, the transformed shape will be rotated so that the edges coincide.  
+If `canvas.rotateSnap` is set to `None` (the default), no rotating will be done.  
+If `canvas.snap` is set to `None`, the value of `canvas.rotateSnap` has no effect.
+
+### canvas.mouseMode = MouseMode.DRAW
 Shapes can be drawn on the canvas by clicking, moving, clicking again...  
-A shape is completed by double-clicking.
-The shape which will be drawn is chosen by setting `canvas.Tool`, which can be:
-`line, polygon, polyline, rectangle, ellipse, circle, bezier, closedbezier`  
-(NB the bezier shapes will be smooth.)
-The stroke, stroke-width and fill of the shape are determined by the values of by `canvas.PenColour`, `canvas.PenWidth`, and `canvas.FillColour`.
+A shape can be completed by double-clicking (for touch-screen use, it may be better to provide a button which calls the `canvas.endDraw()` method).  
+The shape which will be drawn is chosen by setting `canvas.tool`, which can be:
+`line, polygon, polyline, rectangle, ellipse, circle, bezier, closedbezier, smoothbezier, smoothclosedbezier`  
+If `canvas.tool` is set to `"select"`, no drawing will be done. 
+The stroke, stroke-width and fill of the shape are determined by the values of by `canvas.penColour`, `canvas.penWidth`, and `canvas.fillColour`.
 
-### canvas.MouseMode = MouseMode.EDIT
-Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape. (For Bezier shapes there are also "control handles" to control the curvature.) In this mode, `canvas.Tool` will normally be set to `select`.  
+### canvas.mouseMode = MouseMode.EDIT
+Clicking on a shape causes "handles" to be displayed, which can be used to edit the shape. (For Bezier shapes clicking on a handle causes "control handles" to be displayed, to control the curvature.) In this mode, `canvas.tool` will be set to `"select"`.  
 While a shape is selected, pressing the `DEL` key on the keyboard will delete the shape.  
-`canvas.SelectedShape` is the shape curently being edited. Use `canvas.DeSelectShape()` to stop editing a shape and hide the handles.
+`canvas.selectedObject` is the shape curently being edited. Use `canvas.deselectObject()` to stop editing a shape and hide the handles.
     
 ### canvas.MouseMode = MouseMode.NONE
 No user interaction with the canvas.
 
+## Other Objects
 
+###TextObjects
+
+`TextObject(string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None)`  
+A multiline textbox.  Use `"\n"` within `string` to separate lines. To make sure the font-size is not affected by the scaling of the canvas, set `ignorescaling` to `True`, and specify the `canvas` on which the object will be placed.  
+The box is placed at the coordinates given by `anchorpoint`; the `anchorposition` can be from 1 to 9:  
+1  2  3  
+4  5  6  
+7  8  9  
+ie if `anchorposition` is 1, the `anchorpoint` is top-left, if it is 5 it is in the centre of the box, etc.
+
+`WrappingTextObject(canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False`  
+See `TextObject` above for explanation of most of the parameters; however, note that `canvas` *must* be specified.  
+A `width` in SVG units is also specified, and the text `string` will be wrapped at word boundaries to fit that width.
+
+### Buttons
+
+`Button(position, size, text, onclick, fontsize=None, fillcolour="lightgrey", objid=None)`  
+A clickable button with (multiline) `text` on it(use `\n` for line breaks). If `fontsize` is not specified, the text will be scaled to fit the height (but not width) of the button. The `onclick` parameter is the function which handles the click event.
+
+`ImageButton(position, size, image, onclick, fillcolour="lightgrey", canvas=None, objid=None)`  
+A clickable button with an SVG image on it. The centre of the image should be at (0,0). If the `canvas` is specified, the image will be scaled to fit inside the button. The onclick parameter is the function which handles the event.
 
 
 
