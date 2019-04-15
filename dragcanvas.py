@@ -9,7 +9,7 @@
 # MA 02111-1307 USA                                                           #
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
-#import time
+import time
 from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
@@ -834,12 +834,13 @@ class CanvasObject(svg.svg):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
 
     def prepareDrag(self, event):
-        self.mouseOwner = self.selectedObject = self.getSelectedObject(event.target.id)
-        if not self.mouseOwner or self.mouseOwner.fixed: return
-        self <= self.mouseOwner
-        self.StartPoint = self.getSVGcoords(event)
-        self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
-        self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+        self.selectedObject = self.getSelectedObject(event.target.id)
+        if self.selectedObject and not self.selectedObject.fixed:
+            self.mouseOwner = self.selectedObject
+            self <= self.mouseOwner
+            self.StartPoint = self.getSVGcoords(event)
+            self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+            self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
 
     def doDrag(self, event):
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
@@ -853,7 +854,6 @@ class CanvasObject(svg.svg):
         self.mouseOwner.attrs["transform"] = ""
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
-        tt = time.time()
         self.translateObject(self.mouseOwner, offset)
         if self.snap:
             if self.rotateSnap: self.doRotateSnap(self.mouseOwner)
@@ -902,6 +902,9 @@ class Point(object):
 
     def __str__(self):
         return str(tuple(self.coords))
+
+    def __eq__(self, other):
+        return (self.coords == other.coords)
 
     def __add__(self, other):
         if isinstance(other, Point):

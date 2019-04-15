@@ -11,7 +11,7 @@ canvas.rotateSnap = 20
 
 for n,m in [(12, 3), (8, 4), (6, 6)]:
     for i in range(n):
-        poly = SVG.RegularPolygon(m, startpoint=(0, 20), sidelength=40, offsetangle=i*5)
+        poly = SVG.RegularPolygon(m, startpoint=(0, 20), sidelength=60, offsetangle=i*5)
         canvas.addObject(poly)
-        poly.translate((i*m*20, m*100))
+        poly.translate((i*m*25, m*100))
 canvas.fitContents()

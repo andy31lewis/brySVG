@@ -4,10 +4,8 @@ from polygontesting import *
 
 def checkposition(event):
     event.preventDefault()
-    if (event.type == "mouseup" and event.button > 1) or not canvas.selectedObject: return
-    tt = time.time()
+    if (event.type == "mouseup" and event.button > 1) or not canvas.selectedObject or canvas.selectedObject.fixed: return
     result = relativeposition(canvas.selectedObject, fixedshape)
-    print("position", time.time()-tt)
     canvas.selectedObject.style.fill = colours[result]
 
 fixedshape = SVG.PolygonObject([(0,20), (40,60), (60,30), (80,60), (100,20), (110,40), (140,40), (120,60), (140,75), (120,90), (140,105), (120,120), (0,120)], fillcolour="white")

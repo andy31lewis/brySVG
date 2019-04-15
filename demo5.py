@@ -3,11 +3,16 @@ import drawcanvas as SVG
 
 def onButtonClick(event):
     event.stopPropagation()
-    canvas.mouseMode = SVG.MouseMode.DRAW
-    canvas.tool = event.currentTarget.id
+    buttonid = event.currentTarget.id
     for button in buttons.values(): button.setBackgroundColour("pink")
-    buttons[event.currentTarget.id].setBackgroundColour("lime")
-    canvas.style.cursor = "url(cursors/draw{}.png), auto".format(canvas.tool)
+    buttons[buttonid].setBackgroundColour("lime")
+    if buttonid == "select":
+        canvas.endDraw(event)
+        canvas.style.cursor = "auto"
+    else:
+        canvas.mouseMode = SVG.MouseMode.DRAW
+        canvas.tool = buttonid
+        canvas.style.cursor = "url(cursors/draw{}.png), auto".format(canvas.tool)
 
 def onDoubleClick(event):
     for button in buttons.values(): button.setBackgroundColour("pink")
@@ -20,7 +25,7 @@ width, height = canvas.setDimensions()
 canvas.mouseMode = SVG.MouseMode.DRAW
 canvas.bind("dblclick", onDoubleClick)
 icons = {
-"select": SVG.PolygonObject([(-20,-20), (20,-5), (5,0), (25,20), (20,25), (0,5), (-5,20)], linewidth=3, fillcolour=None),
+"select": SVG.PolygonObject([(-20,-20), (20,-5), (5,0), (25,20), (20,25), (0,5), (-5,20)], linewidth=3, fillcolour="none"),
 "polyline": SVG.PolylineObject([(-25,0), (0,-25), (12,25)], linewidth=3),
 "polygon": SVG.PolygonObject([(-25,0), (0,-25), (12,25)], linewidth=3),
 "rectangle": SVG.RectangleObject([(-50,-25), (50,25)], linewidth=5),

@@ -274,7 +274,6 @@ class TransformCanvasMixin(object):
             self.mouseOwner.movePoint((dx, dy))
 
     def doRotateSnap(self, svgobject):
-        tt = time.time()
         if not hasattr(svgobject, "pointList"): return
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
