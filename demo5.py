@@ -2,17 +2,7 @@ from browser import document
 import brySVG as SVG
 from itertools import cycle
 import time
-"""
-lasttaptime = 0
-def onTouchStart(event):
-    global lasttaptime
-    latesttaptime = time.time()
-    if latesttaptime - lasttaptime < 0.3:
-        print("Double tap")
-    else:
-        print("Single tap")
-    lasttaptime = latesttaptime
-"""
+
 def onRightClick(event):
     event.preventDefault()
     canvas.Tool = next(toolcycle)
@@ -30,7 +20,7 @@ toolcycle = cycle(toollist)
 canvas = SVG.CanvasObject("98vw", "90vh", "cyan")
 document["demo5"] <= canvas
 canvas.MouseMode = SVG.MouseMode.DRAW
-canvas.Tool = next(toolcycle)
+canvas.Tool = "closedbezier"
 canvas.style.cursor = "url(brySVG/draw{}.png), auto".format(canvas.Tool)
 canvas.bind("contextmenu", onRightClick)
 #canvas.bind("touchstart", onTouchStart)
