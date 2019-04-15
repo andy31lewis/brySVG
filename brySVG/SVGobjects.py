@@ -10,7 +10,6 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
 import time
-#tt = time.time()
 from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
@@ -28,7 +27,6 @@ def detectMouse(event):
     print(mouseDetected)
 document.bind("mousemove", detectMouse)
 document.bind("touchstart", detectMouse)
-
 
 class Enum(list):
     def __init__(self, name, string):
@@ -1729,22 +1727,27 @@ class TransformHandle(PointObject):
             if self.transformType != TransformType.TRANSLATE: self.style.visibility = "visible"
             self.owner.Canvas.showTransformOrigin()
 
-    #def movePoint(self, coords):
     def movePoint(self, offset):
         (dx, dy) = offset
         if (dx, dy) == (0, 0): return
         (x, y) = self.startx + dx, self.starty + dy
         self.XY = (x, y)
-        (cx, cy) = self.owner.Centre
-        (x1, y1) = self.startx - cx, self.starty - cy
-        (x2, y2) = x -cx, y - cy
-        (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
-        angle = atan2(y3, x3)*180/pi
-
         if self.transformType == TransformType.TRANSLATE:
             #self.style.visibility = "hidden"
             transformstring = "translate({},{})".format(dx, dy)
-        elif self.transformType == TransformType.ROTATE:
+            if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
+                self.owner.attrs["transform"] = transformstring + self.owner.rotatestring
+            else:
+                self.owner.attrs["transform"] = transformstring
+            return
+
+        (cx, cy) = self.owner.Centre
+        (x1, y1) = self.startx - cx, self.starty - cy
+        (x2, y2) = x -cx, y - cy
+
+        if self.transformType == TransformType.ROTATE:
+            (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
+            angle = atan2(y3, x3)*180/pi
             transformstring = "rotate({},{},{})".format(angle,cx,cy)
         elif self.transformType == TransformType.XSTRETCH:
             xfactor = x2/x1
@@ -1758,10 +1761,7 @@ class TransformHandle(PointObject):
             transformstring = "translate({},{}) scale({}) translate({},{})".format(cx, cy, hypot(x2, y2)/hypot(x1, y1), -cx, -cy)
 
         if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
-            if self.transformType == TransformType.TRANSLATE:
-                self.owner.attrs["transform"] = transformstring + self.owner.rotatestring
-            else:
-                self.owner.attrs["transform"] = self.owner.rotatestring + transformstring
+            self.owner.attrs["transform"] = self.owner.rotatestring + transformstring
         else:
             self.owner.attrs["transform"] = transformstring
 
