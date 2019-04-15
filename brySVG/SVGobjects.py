@@ -1203,12 +1203,20 @@ class CanvasObject(svg.svg):
         self.MouseOwner = None
 
     def doRotateSnap(self):
+        svgobject = self.MouseOwner
+        if not hasattr(svgobject, "PointList"): return
+        bbox = svgobject.getBBox()
+        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
         for objid in self.ObjectDict:
-            if objid == self.MouseOwner.id: continue
-            if not getattr(self.ObjectDict[objid], "PointList", None): continue
-            for point1 in self.ObjectDict[objid].PointList:
-                for point2 in self.MouseOwner.PointList:
+            if objid == svgobject.id: continue
+            obj = self.ObjectDict[objid]
+            if not hasattr(obj, "PointList"): continue
+            bbox = obj.getBBox()
+            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+            if L1-R > self.Snap or R1-L < -self.Snap or T1-B > self.Snap or B1-T < -self.Snap: continue
+            for point1 in obj.PointList:
+                for point2 in svgobject.PointList:
                     (dx, dy) = point1 - point2
                     if abs(dx) < self.Snap and abs(dy) < self.Snap:
                         pl1 = self.ObjectDict[objid].PointList
@@ -1217,13 +1225,12 @@ class CanvasObject(svg.svg):
                         vec1a = pl1[(i+1)%L] - point1
                         vec1b = pl1[(i-1)%L] - point1
                         angles1 = [vec1a.angle(), vec1b.angle()]
-                        pl2 = self.MouseOwner.PointList
+                        pl2 = svgobject.PointList
                         L = len(pl2)
                         j = pl2.index(point2)
                         vec2a = pl2[(j+1)%L] - point2
                         vec2b = pl2[(j-1)%L] - point2
                         angles2 = [vec2a.angle(), vec2b.angle()]
-                        #print (angles1, angles2)
                         for a1 in angles1:
                             for a2 in angles2:
                                 diff = a1-a2
@@ -1231,33 +1238,36 @@ class CanvasObject(svg.svg):
                                 testdiff = absdiff if absdiff < pi else 2*pi-absdiff
 
                                 if testdiff < self.RotateSnap*pi/180:
-                                    #print (pl1[i], pl2[j], g1, g2, diff)
-                                    self.MouseOwner.rotate(diff*180/pi)
-                                    #print (self.ObjectDict[objid].PointList[i], self.MouseOwner.PointList[j])
-                                    (dx, dy) = self.ObjectDict[objid].PointList[i] - self.MouseOwner.PointList[j]
-                                    #print (dx, dy)
-                                    self.MouseOwner.translate((dx, dy))
+                                    svgobject.rotate(diff*180/pi)
+                                    (dx, dy) = self.ObjectDict[objid].PointList[i] - svgobject.PointList[j]
+                                    svgobject.translate((dx, dy))
+                                    print("rotatesnap", time.time()-tt)
                                     return
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
-        if bestdx:
-            self.MouseOwner.translate((bestdx, bestdy))
+        if bestdx or bestdy:
+            svgobject.translate((bestdx, bestdy))
 
     def doSnap(self):
+        svgobject = self.MouseOwner
+        if not hasattr(svgobject, "PointList"): return
+        bbox = svgobject.getBBox()
+        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
         bestdx = bestdy = None
         for objid in self.ObjectDict:
-            if objid == self.MouseOwner.id: continue
-            if not getattr(self.ObjectDict[objid], "PointList", None): continue
-            for point1 in self.ObjectDict[objid].PointList:
-                for point2 in self.MouseOwner.PointList:
+            if objid == svgobject.id: continue
+            obj = self.ObjectDict[objid]
+            if not hasattr(obj, "PointList"): continue
+            bbox = obj.getBBox()
+            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+            if L1-R > self.Snap or R1-L < -self.Snap or T1-B > self.Snap or B1-T < -self.Snap: continue
+            for point1 in obj.PointList:
+                for point2 in svgobject.PointList:
                     (dx, dy) = point1 - point2
                     if abs(dx) < self.Snap and abs(dy) < self.Snap:
                         if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy):
-                            #print ("point1", point1)
-                            #print ("point2", point2)
-                            #print (dx, dy)
                             (bestdx, bestdy) = (dx, dy)
-        if bestdx:
-            self.MouseOwner.translate((bestdx, bestdy))
+        if bestdx or bestdy:
+            svgobject.translate((bestdx, bestdy))
 
     def DeSelectShape(self):
         if self.SelectedShape:
