@@ -12,22 +12,17 @@
 
 This module provides classes for simplifying the use of SVG graphics in Brython projects.
 
-To use, download the zip, and move the following files into your own project folder:  
-dragcanvas.py  
-drawcanvas.py  
-transformcanvas.py  
-fullcanvas.py  
-polygontesting.py
+To use, download the zip, and move the brySVG folder into your own project folder:  
 
 Then just include an `import` statement in your brython file:  
-`import dragcanvas as SVG` if only MouseMode.DRAG is required  
-`import transformcanvas as SVG` if MouseMode.TRANSFORM is required (also allows MouseMode.DRAG)  
-`import drawcanvas as SVG` if MouseMode.DRAW and MouseMode.EDIT are required (also allows MouseMode.DRAG)  
-`import fullcanvas as SVG` if all four MouseModes are required  
+`import brySVG.dragcanvas as SVG` if only MouseMode.DRAG is required  
+`import brySVG.transformcanvas as SVG` if MouseMode.TRANSFORM is required (also allows MouseMode.DRAG)  
+`import brySVG.drawcanvas as SVG` if MouseMode.DRAW and MouseMode.EDIT are required (also allows MouseMode.DRAG)  
+`import brySVG.fullcanvas as SVG` if all four MouseModes are required  
 (See below for description of the different modes.)
 
 You can add extra functionality for polygons by including, in addition to one of the above:  
-`from polygontesting import *`  
+`from brySVG.polygontesting import *`  
 See the section **Polygon Testing** below for details of these functions.
 
 Description of some of the classes:

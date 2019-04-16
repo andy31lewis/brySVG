@@ -10,7 +10,7 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
 
-from dragcanvas import *
+from brySVG.dragcanvas import *
 
 class NonBezierMixin(object):
     '''Methods for LineObject, PolylineObject, PolygonObject, CircleObject, EllipseObject and RectangleObject'''

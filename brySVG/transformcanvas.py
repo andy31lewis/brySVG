@@ -10,7 +10,7 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
 
-from dragcanvas import *
+from brySVG.dragcanvas import *
 
 class TransformMixin(object):
     '''Provides methods for objects to be cloned, translated, rotated, stretched or enlarged.
