@@ -88,7 +88,7 @@ class BezierMixin(object):
 class DrawCanvasMixin(object):
     def createObject(self, coords):
         colour = "none" if self.tool in ["polyline", "bezier", "smoothbezier"] else self.fillColour
-        self.mouseOwner = self.shapetypes[self.tool](pointlist=[coords, Point(coords[:])], linecolour=self.penColour, linewidth=self.penWidth, fillcolour=colour)
+        self.mouseOwner = shapetypes[self.tool](pointlist=[coords, coords], linecolour=self.penColour, linewidth=self.penWidth, fillcolour=colour)
         self.addObject(self.mouseOwner)
         self.mouseOwner.shapeType = self.tool
 
@@ -157,11 +157,7 @@ class DrawCanvasMixin(object):
             self.mouseOwner.movePoint((dx, dy))
 
     def endEdit(self, event):
-        hittarget = getattr(self.selectedObject, "hitTarget", None)
-        if hittarget:
-            hittarget.pointList = self.selectedObject.pointList
-            if isinstance(self.selectedObject, BezierMixin): hittarget.pointsetList = self.selectedObject.pointsetList
-            hittarget.update()
+        if self.selectedObject: self.selectedObject.updatehittarget()
         self.mouseOwner = None
 
     def deselectObject(self):
@@ -279,10 +275,8 @@ class RegularPolygon(RegularPolygon, NonBezierMixin):
     pass
 
 class CanvasObject(CanvasObject, DrawCanvasMixin):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-        "rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
-        "bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
+    pass
 
-
+shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
+"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
+"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}

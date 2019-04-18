@@ -72,7 +72,7 @@ class BezierMixin(object):
         self.updatepointsetlist()
         if len(self.pointList) == 2:
             self.update()
-        elif isinstance(self, ClosedBezierObject):
+        elif isinstance(self, (ClosedBezierObject, SmoothClosedBezierObject)):
             ((x1,x2),(x3,x4),(x5,x6)) = self.pointsetList[-2]
             ((x7,x8),(x9,x10),(x11,x12)) = self.pointsetList[-1]
             ((x13,x14),(x15,x16),(x17,x18)) = self.pointsetList[0]
@@ -87,8 +87,8 @@ class BezierMixin(object):
 
 class DrawCanvasMixin(object):
     def createObject(self, coords):
-        colour = None if self.tool in ["polyline", "bezier", "smoothbezier"] else self.fillColour
-        self.mouseOwner = self.shapetypes[self.tool](pointlist=[coords, coords], linecolour=self.penColour, linewidth=self.penWidth, fillcolour=colour)
+        colour = "none" if self.tool in ["polyline", "bezier", "smoothbezier"] else self.fillColour
+        self.mouseOwner = shapetypes[self.tool](pointlist=[coords, coords], linecolour=self.penColour, linewidth=self.penWidth, fillcolour=colour)
         self.addObject(self.mouseOwner)
         self.mouseOwner.shapeType = self.tool
 
@@ -104,10 +104,13 @@ class DrawCanvasMixin(object):
             coords = self.getSVGcoords(event)
             self.createObject(coords)
 
-    def endDraw(self,event):
+    def endDraw(self, event):
         if not self.mouseOwner: return
-        if self.mouseDetected and isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
-            self.mouseOwner.deletePoints(-2, None)
+        svgobj = self.mouseOwner
+        if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
+            if event.type == "dblclick": svgobj.deletePoints(-2, None)
+            elif event.type in ["click", "mousedown"]: svgobj.deletePoints(-1, None)
+            elif svgobj.pointList[0] == svgobj.pointList[1]: svgobj.deletePoints(None, 1)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
 
@@ -154,11 +157,7 @@ class DrawCanvasMixin(object):
             self.mouseOwner.movePoint((dx, dy))
 
     def endEdit(self, event):
-        hittarget = getattr(self.selectedObject, "hitTarget", None)
-        if hittarget:
-            hittarget.pointList = self.selectedObject.pointList
-            if isinstance(self.selectedObject, BezierMixin): hittarget.pointsetList = self.selectedObject.pointsetList
-            hittarget.update()
+        if self.selectedObject: self.selectedObject.updatehittarget()
         self.mouseOwner = None
 
     def deselectObject(self):
@@ -276,10 +275,8 @@ class RegularPolygon(RegularPolygon, NonBezierMixin):
     pass
 
 class CanvasObject(CanvasObject, DrawCanvasMixin):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-        "rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
-        "bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
+    pass
 
-
+shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
+"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
+"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}

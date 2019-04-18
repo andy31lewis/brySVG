@@ -35,13 +35,19 @@ class ObjectMixin(object):
         '''Returns a clone of an object, including the extra functionality provided by this module.
         If that functionality is not needed, it is better to call the DOM method cloneNode(object) on the CanvasObject,
         as that is much faster'''
-        newobject = self.__class__()
-        if isinstance(newobject, GroupObject):
-            newobject.ObjectList = []
+        if isinstance(self, GroupObject):
+            newobject = GroupObject()
             for obj in self.ObjectList:
                 newobj = obj.cloneObject()
                 newobject.addObject(newobj)
-        elif isinstance(self, PointObject):
+            return newobject
+        for objecttype in shapetypes.values():
+            if isinstance(self, objecttype):
+                newobject = objecttype()
+                break
+        else:
+            return None
+        if isinstance(self, PointObject):
             newobject.XY = self.XY
         else:
             newobject.pointList = self.pointList[:]
@@ -50,6 +56,13 @@ class ObjectMixin(object):
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         return newobject
+
+    def updatehittarget(self):
+        hittarget = getattr(self, "hitTarget", None)
+        if hittarget:
+            hittarget.pointList = self.pointList
+            if isinstance(self, BezierMixin): hittarget.pointsetList = self.pointsetList
+            hittarget.update()
 
     def transformedpointlist(self, matrix):
         '''Not intended to be called by end users.'''
@@ -616,6 +629,7 @@ class CanvasObject(svg.svg):
         self.selectedhandle = None
         self.transformorigin = None
         self.transformBBox = RectangleObject(linecolour="blue", fillcolour="none")
+
         self.bind("mousedown", self.onMouseDown)
         self.bind("mousemove", self.onMouseMove)
         self.bind("mouseup", self.onLeftUp)
@@ -742,11 +756,7 @@ class CanvasObject(svg.svg):
             if isinstance(svgobject, BezierMixin):
                 svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
             svgobject.update()
-            hittarget = getattr(svgobject, "hitTarget", None)
-            if hittarget:
-                hittarget.pointList = svgobject.pointList
-                if isinstance(svgobject, BezierMixin): hittarget.pointsetList = svgobject.pointsetList
-                hittarget.update()
+            svgobject.updatehittarget()
 
     #The methods below are not intended to be called by end-users.
     @property
@@ -899,7 +909,7 @@ class CanvasObject(svg.svg):
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''
     def __init__(self, coords):
-        self.coords = coords.coords if isinstance(coords, Point) else list(coords)
+        self.coords = list(coords.coords) if isinstance(coords, Point) else list(coords)
 
     def __str__(self):
         return str(tuple(self.coords))
@@ -969,3 +979,22 @@ class Point(object):
 
     def angle(self):
         return atan2(self.coords[1], self.coords[0])
+
+
+class Matrix(object):
+    def __init__(self, rows):
+        self.rows = rows
+        self.cols = [Point([self.rows[i][j] for i in range(len(self.rows))]) for j in range(len(self.rows[0]))]
+
+    def __str__(self):
+        return str("\n".join(str(row) for row in self.rows))
+
+    def __rmul__(self, other):
+        if isinstance(other, (list, tuple)):
+            return [Point([p*col for col in self.cols]) for p in other]
+        else:
+            return Point([other*col for col in self.cols])
+
+shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
+"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
+"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
