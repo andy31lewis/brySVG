@@ -55,6 +55,7 @@ class ObjectMixin(object):
         if hasattr(self, "angle"): newobject.angle = self.angle
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
+        newobject.id = ""
         return newobject
 
     def updatehittarget(self):

@@ -109,7 +109,7 @@ class DrawCanvasMixin(object):
         svgobj = self.mouseOwner
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
             if event.type == "dblclick": svgobj.deletePoints(-2, None)
-            elif event.type in ["click", "mousedown"]: svgobj.deletePoints(-1, None)
+            elif self.mouseDetected: svgobj.deletePoints(-1, None)
             elif svgobj.pointList[0] == svgobj.pointList[1]: svgobj.deletePoints(None, 1)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
