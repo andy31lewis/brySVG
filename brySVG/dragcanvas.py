@@ -308,18 +308,19 @@ class BezierObject(svg.path, BezierMixin, ObjectMixin):
         self.update()
 
     def getpointsetlist(self, pointlist):
-        pointsetlist = [(None, pointlist[0], (pointlist[0]+pointlist[1])/2)]
+        pointsetlist = [[None, pointlist[0], (pointlist[0]+pointlist[1])/2]]
         for i in range(1, len(pointlist)-1):
-            pointsetlist.append(((pointlist[i-1]+pointlist[i])/2, pointlist[i], (pointlist[i]+pointlist[i+1])/2))
-        pointsetlist.append(((pointlist[-2]+pointlist[-1])/2, pointlist[-1], None))
+            pointsetlist.append([(pointlist[i-1]+pointlist[i])/2, pointlist[i], (pointlist[i]+pointlist[i+1])/2])
+        pointsetlist.append([(pointlist[-2]+pointlist[-1])/2, pointlist[-1], None])
         return pointsetlist
 
     def updatepointsetlist(self):
         if len(self.pointList) == 2:
             self.pointsetList = [[None]+self.pointList, self.pointList+[None]]
         else:
-            self.pointsetList[-1] = ((self.pointList[-1]+self.pointList[-2])/2, self.pointList[-1], None)
-            self.pointsetList[-2] = ((self.pointList[-3]+self.pointList[-2])/2, self.pointList[-2], (self.pointList[-1]+self.pointList[-2])/2)
+            cpoint = (self.pointList[-1]+self.pointList[-2])/2
+            self.pointsetList[-1] = [cpoint, self.pointList[-1], None]
+            self.pointsetList[-2][2] = cpoint
 
     def update(self):
         (dummy, (x1, y1), (c1x, c1y)) = self.pointsetList[0]
@@ -344,19 +345,20 @@ class ClosedBezierObject(svg.path, BezierMixin, ObjectMixin):
         self.update()
 
     def getpointsetlist(self, pointlist):
-        pointsetlist = [((pointlist[0]+pointlist[-1])/2, pointlist[0], (pointlist[0]+pointlist[1])/2)]
+        pointsetlist = [[(pointlist[0]+pointlist[-1])/2, pointlist[0], (pointlist[0]+pointlist[1])/2]]
         for i in range(1, len(pointlist)-1):
-            pointsetlist.append(((pointlist[i-1]+pointlist[i])/2, pointlist[i], (pointlist[i]+pointlist[i+1])/2))
-        pointsetlist.append(((pointlist[-2]+pointlist[-1])/2, pointlist[-1], (pointlist[0]+pointlist[-1])/2))
+            pointsetlist.append([(pointlist[i-1]+pointlist[i])/2, pointlist[i], (pointlist[i]+pointlist[i+1])/2])
+        pointsetlist.append([(pointlist[-2]+pointlist[-1])/2, pointlist[-1], (pointlist[0]+pointlist[-1])/2])
         return pointsetlist
 
     def updatepointsetlist(self):
         if len(self.pointList) == 2:
             self.pointsetList = self.getpointsetlist(self.pointList)
         else:
-            self.pointsetList[0] = ((self.pointList[-1]+self.pointList[0])/2, self.pointList[0], (self.pointList[1]+self.pointList[0])/2)
-            self.pointsetList[-1] = ((self.pointList[-1]+self.pointList[-2])/2, self.pointList[-1], (self.pointList[-1]+self.pointList[0])/2)
-            self.pointsetList[-2] = ((self.pointList[-3]+self.pointList[-2])/2, self.pointList[-2], (self.pointList[-1]+self.pointList[-2])/2)
+            cpoint1, cpoint2 = (self.pointList[-1]+self.pointList[-2])/2, (self.pointList[-1]+self.pointList[0])/2
+            self.pointsetList[-1] = (cpoint1, self.pointList[-1], cpoint2)
+            self.pointsetList[-2][2] = cpoint1
+            self.pointsetList[0][0] = cpoint2
 
     def update(self):
         ((c1x, c1y), (x, y), (c2x, c2y)) = self.pointsetList[0]
@@ -377,9 +379,9 @@ class SmoothBezierObject(SmoothBezierMixin, BezierObject):
         for i in range(1, len(pointlist)-1):
             (c1, c2) = self.calculatecontrolpoints(pointlist[i-1:i+2])
             if i == 1:
-                pointsetlist = [(None, pointlist[0], (pointlist[0]+c1)/2)]
-            pointsetlist.append((c1, pointlist[i], c2))
-        pointsetlist.append(((pointlist[-1]+c2)/2, pointlist[-1], None))
+                pointsetlist = [[None, pointlist[0], (pointlist[0]+c1)/2]]
+            pointsetlist.append([c1, pointlist[i], c2])
+        pointsetlist.append([(pointlist[-1]+c2)/2, pointlist[-1], None])
         return pointsetlist
 
     def updatepointsetlist(self):
@@ -387,8 +389,8 @@ class SmoothBezierObject(SmoothBezierMixin, BezierObject):
             self.pointsetList = [[None]+self.pointList, self.pointList+[None]]
         else:
             (c1, c2) = self.calculatecontrolpoints(self.pointList[-3:])
-            self.pointsetList[-1] = ((self.pointList[-1]+c2)/2, self.pointList[-1], None)
-            self.pointsetList[-2] = (c1, self.pointList[-2], c2)
+            self.pointsetList[-1] = [(self.pointList[-1]+c2)/2, self.pointList[-1], None]
+            self.pointsetList[-2] = [c1, self.pointList[-2], c2]
 
 class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
     '''Wrapper for svg path element.  Parameter:
@@ -405,7 +407,7 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
         pointsetlist = []
         for i in range(1, len(pointlist)-1):
             (c1, c2) = self.calculatecontrolpoints(pointlist[i-1:i+2])
-            pointsetlist.append((c1, pointlist[i], c2))
+            pointsetlist.append([c1, pointlist[i], c2])
         return pointsetlist
 
     def updatepointsetlist(self):
@@ -416,7 +418,7 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
             pointlist = self.pointList[:]+self.pointList[:2]
             for j in range(L-2, L+1):
                 (c1, c2) = self.calculatecontrolpoints(pointlist[j-1:j+2])
-                self.pointsetList[j%L] = (c1, pointlist[j], c2)
+                self.pointsetList[j%L] = [c1, pointlist[j], c2]
 
 class PointObject(svg.circle, ObjectMixin):
     '''A point (small circle) on a diagram. Parameters:
@@ -712,6 +714,8 @@ class CanvasObject(svg.svg):
             if self.selectedObject:
                 if self.handles: self.deleteObject(self.handles)
                 if self.controlhandles: self.deleteObject(self.controlhandles)
+                hittarget = getattr(self.selectedObject, "hitTarget", None)
+                if hittarget: self.deleteObject(hittarget)
                 self.deleteObject(self.selectedObject)
                 self.selectedObject = self.handles = self.controlhandles = None
 

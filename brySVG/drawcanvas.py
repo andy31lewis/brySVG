@@ -31,6 +31,10 @@ class PolyshapeMixin(object):
         self.pointList.append(point)
         self.update()
 
+    def insertPoint(self, index, point):
+        self.pointList.insert(index, point)
+        self.update()
+
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
         self.update()
@@ -65,6 +69,18 @@ class BezierMixin(object):
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
         self.pointsetList = self.getpointsetlist(self.pointList)
+        self.update()
+
+    def insertPoint(self, index, point):
+        self.pointList.insert(index, point)
+        if isinstance(self, SmoothBezierMixin):
+            self.pointsetList = self.getpointsetlist(self.pointList)
+        else:
+            L = len(self.pointList)
+            cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
+            self.pointsetList.insert(index, [cpoint1, point, cpoint2])
+            self.pointsetList[index-1][2] = cpoint1
+            self.pointsetList[(index+1)%L][0] = cpoint2
         self.update()
 
     def movePoint(self, point):
@@ -119,6 +135,9 @@ class DrawCanvasMixin(object):
         svgobject = self.getSelectedObject(event.target.id, getGroup=False)
         if not svgobject or svgobject.fixed: return
         self.selectedObject = svgobject
+        self.createHandles(svgobject)
+
+    def createHandles(self, svgobject):
         if isinstance(svgobject, BezierMixin):
             handles = []
             controlhandles = []
@@ -229,7 +248,7 @@ class ControlHandle(PointObject):
 
     def movePoint(self, offset):
         self.XY += offset
-        pointset = list(self.owner.pointsetList[self.index])
+        pointset = self.owner.pointsetList[self.index]
         pointset[self.subindex] = self.XY
         if self.linkedHandle:
             point = pointset[1]
@@ -239,7 +258,7 @@ class ControlHandle(PointObject):
             newothercoords = point-newoffset
             pointset[self.linkedHandle.subindex] = newothercoords
             self.linkedHandle.XY = newothercoords
-        self.owner.setPointset(self.index, tuple(pointset))
+        self.owner.setPointset(self.index, pointset)
 
 class LineObject(LineObject, NonBezierMixin):
     pass
@@ -277,6 +296,4 @@ class RegularPolygon(RegularPolygon, NonBezierMixin):
 class CanvasObject(CanvasObject, DrawCanvasMixin):
     pass
 
-shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
-"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
+
