@@ -296,4 +296,7 @@ class RegularPolygon(RegularPolygon, NonBezierMixin):
 class CanvasObject(CanvasObject, DrawCanvasMixin):
     pass
 
+shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
+"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
+"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
 
