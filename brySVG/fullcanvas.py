@@ -34,6 +34,7 @@ class PolyshapeMixin(object):
     def insertPoint(self, index, point):
         self.pointList.insert(index, point)
         self.update()
+        self.updatehittarget()
 
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
@@ -50,6 +51,7 @@ class BezierMixin(object):
         self.pointList = [pointset[1] for pointset in pointsetlist]
         self.pointsetList = pointsetlist
         self.update()
+        self.updatehittarget()
 
     def setPoint(self, i, point):
         self.pointList[i] = point
@@ -82,6 +84,7 @@ class BezierMixin(object):
             self.pointsetList[index-1][2] = cpoint1
             self.pointsetList[(index+1)%L][0] = cpoint2
         self.update()
+        self.updatehittarget()
 
     def movePoint(self, point):
         self.pointList[-1] = point
@@ -129,6 +132,7 @@ class DrawCanvasMixin(object):
             elif svgobj.pointList[0] == svgobj.pointList[1]: svgobj.deletePoints(None, 1)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
+        return svgobj
 
     def prepareEdit(self, event):
         if self.selectedObject: self.deselectObject()
@@ -140,12 +144,11 @@ class DrawCanvasMixin(object):
     def createHandles(self, svgobject):
         if isinstance(svgobject, BezierMixin):
             handles = []
-            controlhandles = []
             for i, (point0, point1, point2) in enumerate(svgobject.pointsetList):
-                handle = Handle(svgobject, i, point1, self)
+                handle = Handle(svgobject, i, point1, "red", self)
                 handle.controlHandles = []
-                ch0 = None if point0 is None else ControlHandle(svgobject, i, 0, point0, self)
-                ch2 = None if point2 is None else ControlHandle(svgobject, i, 2, point2, self)
+                ch0 = None if point0 is None else ControlHandle(svgobject, i, 0, point0, "green", self)
+                ch2 = None if point2 is None else ControlHandle(svgobject, i, 2, point2, "green", self)
                 if ch0:
                     ch0.linkedHandle = ch2 if isinstance(svgobject, SmoothBezierMixin) else None
                     handle.controlHandles.append(ch0)
@@ -158,7 +161,7 @@ class DrawCanvasMixin(object):
             self.controlhandles = GroupObject([ch for handle in handles for ch in handle.controlHandles])
             self <= self.controlhandles
         else:
-            self.handles = GroupObject([Handle(svgobject, i, coords, self) for i, coords in enumerate(svgobject.pointList)])
+            self.handles = GroupObject([Handle(svgobject, i, coords, "red", self) for i, coords in enumerate(svgobject.pointList)])
             self <= self.handles
 
     def movePoint(self, event):
@@ -181,19 +184,22 @@ class DrawCanvasMixin(object):
 
     def deselectObject(self):
         if not self.selectedObject: return
+        self.deleteHandles()
+        self.mouseOwner = self.selectedObject = self.selectedhandle = None
+
+    def deleteHandles(self):
         self.deleteObject(self.handles)
         self.handles = None
         if isinstance(self.selectedObject, BezierMixin):
             self.deleteObject(self.controlhandles)
             self.controlhandles = None
-        self.mouseOwner = self.selectedObject = self.selectedhandle = None
 
 class Handle(PointObject):
-    def __init__(self, owner, index, coords, canvas):
+    def __init__(self, owner, index, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
         opacity = 1 if canvas.mouseDetected else 0.2
         strokewidth = 1 if canvas.mouseDetected else 3
-        PointObject.__init__(self, coords, "red", pointsize, canvas)
+        PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.strokeWidth = strokewidth
         self.style.fillOpacity = opacity
         self.owner = owner
@@ -225,11 +231,11 @@ class Handle(PointObject):
             self.owner.setPoint(self.index, self.XY)
 
 class ControlHandle(PointObject):
-    def __init__(self, owner, index, subindex, coords, canvas):
+    def __init__(self, owner, index, subindex, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
         opacity = 1 if canvas.mouseDetected else 0.2
         strokewidth = 1 if canvas.mouseDetected else 3
-        PointObject.__init__(self, coords, "green", pointsize, canvas)
+        PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.fillOpacity = opacity
         self.style.strokeWidth = strokewidth
         self.style.visibility = "hidden"
