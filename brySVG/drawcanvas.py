@@ -79,7 +79,8 @@ class BezierMixin(object):
             self.pointsetList = self.getpointsetlist(self.pointList)
         else:
             L = len(self.pointList)
-            cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
+            cpoint1, cpoint2 = SmoothBezierMixin.calculatecontrolpoints(self, self.pointList[index-1:index+2])
+            #cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
             self.pointsetList.insert(index, [cpoint1, point, cpoint2])
             self.pointsetList[index-1][2] = cpoint1
             self.pointsetList[(index+1)%L][0] = cpoint2
