@@ -135,6 +135,25 @@ class DrawCanvasMixin(object):
         self.mouseMode = MouseMode.EDIT
         return svgobj
 
+    def createEditHitTargets(self):
+        print("Got to here")
+        objlist = list(self.objectDict.values())
+        for obj in objlist:
+            if obj.fixed: continue
+            if hasattr(obj, "hitTarget"): continue
+            if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
+            if isinstance(obj, (PolyshapeMixin, BezierMixin)):
+                newobj = HitTarget(obj, self)
+            else:
+                if obj.style.fill != "none": continue
+                newobj = obj.cloneObject()
+                newobj.reference = obj
+                newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
+                newobj.style.opacity = 0
+            obj.hitTarget = newobj
+            self.hittargets.append(newobj)
+            self.addObject(newobj)
+
     def prepareEdit(self, event):
         if self.selectedObject: self.deselectObject()
         svgobject = self.getSelectedObject(event.target.id, getGroup=False)
@@ -179,8 +198,25 @@ class DrawCanvasMixin(object):
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
             self.mouseOwner.movePoint((dx, dy))
 
+    def insertPoint(self, event):
+        if not self.selectedObject: return
+        try:
+            index = self.objectDict[event.target.id].segmentindex
+        except AttributeError:
+            return
+        self.deleteObject(self.handles)
+        self.deleteObject(self.controlhandles)
+        clickpoint = self.getSVGcoords(event)
+        svgobject = self.selectedObject
+        svgobject.insertPoint(index, clickpoint)
+        svgobject.updatehittarget()
+        self.createHandles(svgobject)
+
     def endEdit(self, event):
-        if self.selectedObject: self.selectedObject.updatehittarget()
+        if self.selectedObject:
+            self.selectedObject.updatehittarget()
+            if self.handles: self <= self.handles
+            if self.controlhandles: self <= self.controlhandles
         self.mouseOwner = None
 
     def deselectObject(self):
@@ -194,6 +230,50 @@ class DrawCanvasMixin(object):
         if isinstance(self.selectedObject, BezierMixin):
             self.deleteObject(self.controlhandles)
             self.controlhandles = None
+
+class HitTargetSegment(LineObject):
+    def __init__(self, pointlist, width, reference, index):
+        LineObject.__init__(self, pointlist, linewidth=width)
+        self.reference = reference
+        self.segmentindex = index
+        self.style.stroke = "orange"
+        self.style.opacity = 0.5
+
+class BezierHitTargetSegment(BezierObject):
+    def __init__(self, pointsetlist, width, reference, index):
+        BezierObject.__init__(self, pointsetlist, linewidth=width)
+        self.reference = reference
+        self.segmentindex = index
+        self.style.stroke = "orange"
+        self.style.opacity = 0.5
+
+class HitTarget(GroupObject):
+    def __init__(self, reference, canvas):
+        GroupObject.__init__(self)
+        self.reference = reference
+        self.canvas = canvas
+        self.update()
+
+    def update(self):
+        self.deleteAll()
+        width = 10*self.canvas.scaleFactor if self.canvas.mouseDetected else 25*self.canvas.scaleFactor
+        if isinstance(self.reference, PolyshapeMixin):
+            pointlist = self.reference.pointList[:]
+            if isinstance(self.reference, PolygonObject): pointlist.append(pointlist[0])
+            for i in range(len(pointlist)-1):
+                segment = HitTargetSegment(pointlist[i:i+2], width, self.reference, i+1)
+                self.addObject(segment)
+        else:
+            pointsetlist = self.reference.pointsetList[:]
+            if isinstance(self.reference, (ClosedBezierObject, SmoothClosedBezierObject)): pointsetlist.append(pointsetlist[0])
+            print(len(pointsetlist))
+            for i in range(len(pointsetlist)-1):
+                ps0 = [None] + pointsetlist[i][1:]
+                ps1 = pointsetlist[i+1][:-1] + [None]
+                segment = BezierHitTargetSegment([ps0, ps1], width, self.reference, i+1)
+                self.addObject(segment)
+        self.canvas.deleteObject(self)
+        self.canvas.addObject(self)
 
 class Handle(PointObject):
     def __init__(self, owner, index, coords, colour, canvas):
