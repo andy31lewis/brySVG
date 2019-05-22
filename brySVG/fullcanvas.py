@@ -136,7 +136,6 @@ class DrawCanvasMixin(object):
         return svgobj
 
     def createEditHitTargets(self):
-        print("Got to here")
         objlist = list(self.objectDict.values())
         for obj in objlist:
             if obj.fixed: continue
@@ -199,11 +198,11 @@ class DrawCanvasMixin(object):
             self.mouseOwner.movePoint((dx, dy))
 
     def insertPoint(self, event):
-        if not self.selectedObject: return
+        if not self.selectedObject: return None, None
         try:
             index = self.objectDict[event.target.id].segmentindex
         except AttributeError:
-            return
+            return None, None
         self.deleteObject(self.handles)
         self.deleteObject(self.controlhandles)
         clickpoint = self.getSVGcoords(event)
@@ -211,6 +210,7 @@ class DrawCanvasMixin(object):
         svgobject.insertPoint(index, clickpoint)
         svgobject.updatehittarget()
         self.createHandles(svgobject)
+        return index, clickpoint
 
     def endEdit(self, event):
         if self.selectedObject:
@@ -236,16 +236,14 @@ class HitTargetSegment(LineObject):
         LineObject.__init__(self, pointlist, linewidth=width)
         self.reference = reference
         self.segmentindex = index
-        self.style.stroke = "orange"
-        self.style.opacity = 0.5
+        self.style.opacity = 0
 
 class BezierHitTargetSegment(BezierObject):
     def __init__(self, pointsetlist, width, reference, index):
         BezierObject.__init__(self, pointsetlist, linewidth=width)
         self.reference = reference
         self.segmentindex = index
-        self.style.stroke = "orange"
-        self.style.opacity = 0.5
+        self.style.opacity = 0
 
 class HitTarget(GroupObject):
     def __init__(self, reference, canvas):
@@ -266,7 +264,6 @@ class HitTarget(GroupObject):
         else:
             pointsetlist = self.reference.pointsetList[:]
             if isinstance(self.reference, (ClosedBezierObject, SmoothClosedBezierObject)): pointsetlist.append(pointsetlist[0])
-            print(len(pointsetlist))
             for i in range(len(pointsetlist)-1):
                 ps0 = [None] + pointsetlist[i][1:]
                 ps1 = pointsetlist[i+1][:-1] + [None]
@@ -278,8 +275,8 @@ class HitTarget(GroupObject):
 class Handle(PointObject):
     def __init__(self, owner, index, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
-        opacity = 1 if canvas.mouseDetected else 0.2
-        strokewidth = 1 if canvas.mouseDetected else 3
+        opacity = 0.4
+        strokewidth = 3
         PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.strokeWidth = strokewidth
         self.style.fillOpacity = opacity
@@ -314,8 +311,8 @@ class Handle(PointObject):
 class ControlHandle(PointObject):
     def __init__(self, owner, index, subindex, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
-        opacity = 1 if canvas.mouseDetected else 0.2
-        strokewidth = 1 if canvas.mouseDetected else 3
+        opacity = 0.4
+        strokewidth = 3
         PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.fillOpacity = opacity
         self.style.strokeWidth = strokewidth
