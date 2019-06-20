@@ -1,5 +1,7 @@
 # brySVG
 
+To see examples of brySVG in action, try the demo [here](http://mathsanswers.org.uk/oddments/brySVG/demo.html).
+
 ## New in version 0.2.0
 
 - Support for touch screens, including larger, "finger-sized" handles and more touch-friendly selection of thin lines.  
