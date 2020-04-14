@@ -118,6 +118,7 @@ class DrawCanvasMixin(object):
             if isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
                 coords = self.getSVGcoords(event)
                 self.mouseOwner.appendPoint(coords)
+                print("Appended a point")
         else:
             self.startx = self.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = self.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -128,9 +129,18 @@ class DrawCanvasMixin(object):
         if not self.mouseOwner: return
         svgobj = self.mouseOwner
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
-            if event.type == "dblclick": svgobj.deletePoints(-2, None)
-            elif self.mouseDetected: svgobj.deletePoints(-1, None)
-            elif svgobj.pointList[0] == svgobj.pointList[1]: svgobj.deletePoints(None, 1)
+            if event.type == "dblclick":
+                svgobj.deletePoints(-2, None)
+                print("Deeleted last 2 points")
+            elif self.mouseDetected:
+                svgobj.deletePoints(-1, None)
+                print("Deleted last point")
+            elif svgobj.pointList[0] == svgobj.pointList[1]:
+                svgobj.deletePoints(None, 1)
+                print("deleted first point")
+        while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
+            svgobj.deletePoints(-1, None)
+        if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
         return svgobj

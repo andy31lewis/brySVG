@@ -184,6 +184,7 @@ def relativeposition(poly1, poly2, dp=1):
                 rlist.append(makeregion(chr(nextrlabel), [newy1, newy2], STARTING))
                 nextrlabel += 1
             elif t1=="L" and t2=="L":
+                print(rlist, rindex, rcount)
                 rlist[rindex]["bounds"] = [oldy1, oldy2]
                 rlist[rindex]["status"] = ENDING
             elif t1=="N":
@@ -230,7 +231,9 @@ def relativeposition(poly1, poly2, dp=1):
             if t2 != "R": rindex += 1
             if t2 != "L":
                 if newrlist:
+                    print("extending", rlist, newrlist)
                     rlist.extend(newrlist)
+                    print("extended", rlist)
                     newrlist = []
 
         rlist.sort(key=lambda x: x["bounds"])
@@ -321,6 +324,7 @@ def relativeposition(poly1, poly2, dp=1):
         transposed = True
 
     xvalues = sorted(set(x for (x, y) in poly1+poly2))
+    print(poly1, poly2, xvalues)
     rlist1 = []
     rlist2 = []
     rdict = {}
@@ -329,12 +333,12 @@ def relativeposition(poly1, poly2, dp=1):
     currentoutcome = None
     for i, x in enumerate(xvalues): #Vertical sweepline stops at each vertex of either polygon
         intervals1 = getintervals(poly1, x)
-        #print (x)
+        print("\n\nx-value", x)
         rlist1, nextrlabel1 = getregions(intervals1, rlist1, nextrlabel1)
-        #print (rlist1)
+        print("\nrlist1", rlist1)
         intervals2 = getintervals(poly2, x)
         rlist2, nextrlabel2 = getregions(intervals2, rlist2, nextrlabel2)
-        #print (rlist2)
+        print("\nrlist2", rlist2)
 
         currentoutcome = compareintervals(currentoutcome, rlist1, rlist2)
         #print ("currentoutcome", currentoutcome, "\n")
