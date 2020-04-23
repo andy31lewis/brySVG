@@ -695,7 +695,7 @@ class CanvasObject(svg.svg):
 
     def deleteObject(self, svgobject):
         '''Delete an object from the canvas'''
-        if not svgobject: return
+        if not self.contains(svgobject): return
         self.removeChild(svgobject)
         try:
             del self.objectDict[svgobject.id]
@@ -774,21 +774,27 @@ class CanvasObject(svg.svg):
         if currentmm == mm: return
         if currentmm == MouseMode.TRANSFORM: self.hideTransformHandles()
         elif currentmm == MouseMode.EDIT: self.deselectObject()
-
         self._mouseMode = mm
         self.tool = "select"
         if mm in [MouseMode.DRAG, MouseMode.EDIT, MouseMode.TRANSFORM]:
-            for obj in self.objectDict.values():
-                if obj.style.fill != "none" or obj.fixed: continue
-                if hasattr(obj, "hitTarget"): continue
-                if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
-                newobj = obj.cloneObject()
-                newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
-                newobj.style.opacity = 0
-                newobj.reference = obj
-                obj.hitTarget = newobj
-                self.hittargets.append(newobj)
-                self.addObject(newobj)
+            try:
+                self.createEditHitTargets()
+            except AttributeError:
+                self.createHitTargets()
+
+    def createHitTargets(self):
+        objlist = list(self.objectDict.values())
+        for obj in objlist:
+            if obj.style.fill != "none" or obj.fixed: continue
+            if hasattr(obj, "hitTarget"): continue
+            if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
+            newobj = obj.cloneObject()
+            newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
+            newobj.style.opacity = 0
+            newobj.reference = obj
+            obj.hitTarget = newobj
+            self.hittargets.append(newobj)
+            self.addObject(newobj)
 
     def onRightClick(self, event):
         event.preventDefault()

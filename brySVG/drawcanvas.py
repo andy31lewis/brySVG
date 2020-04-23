@@ -118,6 +118,7 @@ class DrawCanvasMixin(object):
             if isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
                 coords = self.getSVGcoords(event)
                 self.mouseOwner.appendPoint(coords)
+                print("Appended a point")
         else:
             self.startx = self.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = self.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -128,12 +129,39 @@ class DrawCanvasMixin(object):
         if not self.mouseOwner: return
         svgobj = self.mouseOwner
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
-            if event.type == "dblclick": svgobj.deletePoints(-2, None)
-            elif self.mouseDetected: svgobj.deletePoints(-1, None)
-            elif svgobj.pointList[0] == svgobj.pointList[1]: svgobj.deletePoints(None, 1)
+            if event.type == "dblclick":
+                svgobj.deletePoints(-2, None)
+                print("Deeleted last 2 points")
+            elif self.mouseDetected:
+                svgobj.deletePoints(-1, None)
+                print("Deleted last point")
+            elif svgobj.pointList[0] == svgobj.pointList[1]:
+                svgobj.deletePoints(None, 1)
+                print("deleted first point")
+        while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
+            svgobj.deletePoints(-1, None)
+        if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
         return svgobj
+
+    def createEditHitTargets(self):
+        objlist = list(self.objectDict.values())
+        for obj in objlist:
+            if obj.fixed: continue
+            if hasattr(obj, "hitTarget"): continue
+            if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
+            if isinstance(obj, (PolyshapeMixin, BezierMixin)):
+                newobj = HitTarget(obj, self)
+            else:
+                if obj.style.fill != "none": continue
+                newobj = obj.cloneObject()
+                newobj.reference = obj
+                newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
+                newobj.style.opacity = 0
+            obj.hitTarget = newobj
+            self.hittargets.append(newobj)
+            self.addObject(newobj)
 
     def prepareEdit(self, event):
         if self.selectedObject: self.deselectObject()
@@ -179,8 +207,26 @@ class DrawCanvasMixin(object):
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
             self.mouseOwner.movePoint((dx, dy))
 
+    def insertPoint(self, event):
+        if not self.selectedObject: return None, None
+        try:
+            index = self.objectDict[event.target.id].segmentindex
+        except AttributeError:
+            return None, None
+        self.deleteObject(self.handles)
+        self.deleteObject(self.controlhandles)
+        clickpoint = self.getSVGcoords(event)
+        svgobject = self.selectedObject
+        svgobject.insertPoint(index, clickpoint)
+        svgobject.updatehittarget()
+        self.createHandles(svgobject)
+        return index, clickpoint
+
     def endEdit(self, event):
-        if self.selectedObject: self.selectedObject.updatehittarget()
+        if self.selectedObject:
+            self.selectedObject.updatehittarget()
+            if self.handles: self <= self.handles
+            if self.controlhandles: self <= self.controlhandles
         self.mouseOwner = None
 
     def deselectObject(self):
@@ -195,11 +241,52 @@ class DrawCanvasMixin(object):
             self.deleteObject(self.controlhandles)
             self.controlhandles = None
 
+class HitTargetSegment(LineObject):
+    def __init__(self, pointlist, width, reference, index):
+        LineObject.__init__(self, pointlist, linewidth=width)
+        self.reference = reference
+        self.segmentindex = index
+        self.style.opacity = 0
+
+class BezierHitTargetSegment(BezierObject):
+    def __init__(self, pointsetlist, width, reference, index):
+        BezierObject.__init__(self, pointsetlist, linewidth=width)
+        self.reference = reference
+        self.segmentindex = index
+        self.style.opacity = 0
+
+class HitTarget(GroupObject):
+    def __init__(self, reference, canvas):
+        GroupObject.__init__(self)
+        self.reference = reference
+        self.canvas = canvas
+        self.update()
+
+    def update(self):
+        self.deleteAll()
+        width = 10*self.canvas.scaleFactor if self.canvas.mouseDetected else 25*self.canvas.scaleFactor
+        if isinstance(self.reference, PolyshapeMixin):
+            pointlist = self.reference.pointList[:]
+            if isinstance(self.reference, PolygonObject): pointlist.append(pointlist[0])
+            for i in range(len(pointlist)-1):
+                segment = HitTargetSegment(pointlist[i:i+2], width, self.reference, i+1)
+                self.addObject(segment)
+        else:
+            pointsetlist = self.reference.pointsetList[:]
+            if isinstance(self.reference, (ClosedBezierObject, SmoothClosedBezierObject)): pointsetlist.append(pointsetlist[0])
+            for i in range(len(pointsetlist)-1):
+                ps0 = [None] + pointsetlist[i][1:]
+                ps1 = pointsetlist[i+1][:-1] + [None]
+                segment = BezierHitTargetSegment([ps0, ps1], width, self.reference, i+1)
+                self.addObject(segment)
+        self.canvas.deleteObject(self)
+        self.canvas.addObject(self)
+
 class Handle(PointObject):
     def __init__(self, owner, index, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
-        opacity = 1 if canvas.mouseDetected else 0.2
-        strokewidth = 1 if canvas.mouseDetected else 3
+        opacity = 0.4
+        strokewidth = 3
         PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.strokeWidth = strokewidth
         self.style.fillOpacity = opacity
@@ -234,8 +321,8 @@ class Handle(PointObject):
 class ControlHandle(PointObject):
     def __init__(self, owner, index, subindex, coords, colour, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
-        opacity = 1 if canvas.mouseDetected else 0.2
-        strokewidth = 1 if canvas.mouseDetected else 3
+        opacity = 0.4
+        strokewidth = 3
         PointObject.__init__(self, coords, colour, pointsize, canvas)
         self.style.fillOpacity = opacity
         self.style.strokeWidth = strokewidth
