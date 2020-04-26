@@ -131,16 +131,18 @@ class DrawCanvasMixin(object):
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
             if event.type == "dblclick":
                 svgobj.deletePoints(-2, None)
-                print("Deeleted last 2 points")
+                print("Deleted last 2 points")
             elif self.mouseDetected:
                 svgobj.deletePoints(-1, None)
                 print("Deleted last point")
             elif svgobj.pointList[0] == svgobj.pointList[1]:
                 svgobj.deletePoints(None, 1)
                 print("deleted first point")
-        while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
-            svgobj.deletePoints(-1, None)
-        if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
+            while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
+                svgobj.deletePoints(-1, None)
+            if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
+        elif isinstance(svgobj, NonBezierMixin):
+            if svgobj.pointList[0] == svgobj.pointList[1]: self.deleteObject(svgobj)
         self.mouseOwner = None
         self.mouseMode = MouseMode.EDIT
         return svgobj
@@ -211,7 +213,7 @@ class DrawCanvasMixin(object):
         if not self.selectedObject: return None, None
         try:
             index = self.objectDict[event.target.id].segmentindex
-        except AttributeError:
+        except (KeyError, AttributeError):
             return None, None
         self.deleteObject(self.handles)
         self.deleteObject(self.controlhandles)
@@ -297,6 +299,7 @@ class Handle(PointObject):
         self.bind("touchstart", self.select)
 
     def select(self, event):
+        if event.type == "mousedown" and event.button > 0: return
         event.stopPropagation()
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
