@@ -51,7 +51,7 @@ class ObjectMixin(object):
             newobject.XY = self.XY
         else:
             newobject.pointList = self.pointList[:]
-            if isinstance(self, BezierMixin): newobject.pointsetList = self.pointsetList[:]
+            if isinstance(self, BezierObject): newobject.pointsetList = self.pointsetList[:]
         if hasattr(self, "angle"): newobject.angle = self.angle
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
@@ -62,7 +62,7 @@ class ObjectMixin(object):
         hittarget = getattr(self, "hitTarget", None)
         if hittarget:
             hittarget.pointList = self.pointList
-            if isinstance(self, BezierMixin): hittarget.pointsetList = self.pointsetList
+            if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
             hittarget.update()
 
     def transformedpointlist(self, matrix):
@@ -75,16 +75,7 @@ class ObjectMixin(object):
             newpointlist.append(Point((pt.x, pt.y)))
         return newpointlist
 
-class NonBezierMixin(object):
-    pass
-
-class PolyshapeMixin(object):
-    pass
-
-class BezierMixin(object):
-    pass
-
-class SmoothBezierMixin(BezierMixin):
+class SmoothBezierMixin(object):
     '''Extra methods for SmoothBezierObject and SmoothClosedBezierObject.'''
     def calculatecontrolpoints(self, points):
         '''Not intended to be called by end users.'''
@@ -103,7 +94,7 @@ class SmoothBezierMixin(BezierMixin):
         c2 = ((c2x+x2)/2, (c2y+y2)/2)
         return (Point(c1), Point(c2))
 
-class LineObject(svg.line, ObjectMixin, NonBezierMixin):
+class LineObject(svg.line, ObjectMixin):
     '''A wrapper for SVG line.'''
     def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none"):
         [(x1, y1), (x2, y2)] = pointlist
@@ -197,7 +188,7 @@ class WrappingTextObject(svg.text):
             yoffset = fontsize*(1-rowcount)
         self.attrs["y"] = y+yoffset
 
-class PolylineObject(svg.polyline, ObjectMixin, NonBezierMixin, PolyshapeMixin):
+class PolylineObject(svg.polyline, ObjectMixin):
     '''Wrapper for SVG polyline. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none"):
@@ -208,7 +199,7 @@ class PolylineObject(svg.polyline, ObjectMixin, NonBezierMixin, PolyshapeMixin):
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
-class PolygonObject(svg.polygon, ObjectMixin, NonBezierMixin, PolyshapeMixin):
+class PolygonObject(svg.polygon, ObjectMixin):
     '''Wrapper for SVG polygon. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
@@ -219,7 +210,7 @@ class PolygonObject(svg.polygon, ObjectMixin, NonBezierMixin, PolyshapeMixin):
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
-class RectangleObject(svg.rect, ObjectMixin, NonBezierMixin):
+class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
     pointlist: a list of coordinates for two opposite vertices
     angle: an optional angle of rotation (clockwise, in degrees).'''
@@ -244,7 +235,7 @@ class RectangleObject(svg.rect, ObjectMixin, NonBezierMixin):
         self.attrs["width"] = abs(x2-x1)
         self.attrs["height"] = abs(y2-y1)
 
-class EllipseObject(svg.ellipse, ObjectMixin, NonBezierMixin):
+class EllipseObject(svg.ellipse, ObjectMixin):
     '''Wrapper for SVG ellipse.  Parameters:
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
     and an optional angle of rotation (clockwise, in degrees).'''
@@ -269,7 +260,7 @@ class EllipseObject(svg.ellipse, ObjectMixin, NonBezierMixin):
         self.attrs["rx"]=abs(x2-x1)/2
         self.attrs["ry"]=abs(y2-y1)/2
 
-class CircleObject(svg.circle, ObjectMixin, NonBezierMixin):
+class CircleObject(svg.circle, ObjectMixin):
     '''Wrapper for SVG circle. Parameters:
     EITHER  centre and radius,
     OR pointlist: a list of two points: the centre, and any point on the circumference.'''
@@ -288,7 +279,7 @@ class CircleObject(svg.circle, ObjectMixin, NonBezierMixin):
         self.attrs["cy"]=y1
         self.attrs["r"]=hypot(x2-x1, y2-y1)
 
-class BezierObject(svg.path, BezierMixin, ObjectMixin):
+class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
@@ -328,7 +319,7 @@ class BezierObject(svg.path, BezierMixin, ObjectMixin):
         self.plist = ["M", x1, y1, "C", c1x, c1y]+[x for p in self.pointsetList[1:-1] for c in p for x in c]+[c2x, c2y, x2, y2]
         self.attrs["d"] = " ".join(str(x) for x in self.plist)
 
-class ClosedBezierObject(svg.path, BezierMixin, ObjectMixin):
+class ClosedBezierObject(BezierObject):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
@@ -758,7 +749,7 @@ class CanvasObject(svg.svg):
             svgobject.XY += offset
         else:
             svgobject.pointList = [point+offset for point in svgobject.pointList]
-            if isinstance(svgobject, BezierMixin):
+            if isinstance(svgobject, BezierObject):
                 svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
             svgobject.update()
             svgobject.updatehittarget()

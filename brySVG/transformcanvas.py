@@ -13,29 +13,9 @@
 from brySVG.dragcanvas import *
 
 class TransformMixin(object):
-    '''Provides methods for objects to be cloned, translated, rotated, stretched or enlarged.
+    '''Provides methods for objects to be translated, rotated, stretched or enlarged.
     Note that if no mouse interaction is needed with the objects after the transformation, it is better to use the
     translateElement, rotateElement, scaleElement methods provided by the CanvasObject, as they are much faster.'''
-
-    def cloneObject(self):
-        '''Returns a clone of an object, including the extra functionality provided by this module.
-        If that functionality is not needed, it is better to call the DOM method cloneNode(object) on the CanvasObject,
-        as that is much faster'''
-        newobject = self.__class__()
-        if isinstance(newobject, GroupObject):
-            newobject.ObjectList = []
-            for obj in self.ObjectList:
-                newobj = obj.cloneObject()
-                newobject.addObject(newobj)
-        elif isinstance(self, PointObject):
-            newobject.XY = self.XY
-        else:
-            newobject.pointList = self.pointList[:]
-            if isinstance(self, BezierMixin): newobject.pointsetList = self.pointsetList[:]
-        if hasattr(self, "angle"): newobject.angle = self.angle
-        for (key, value) in self.attrs.items():
-            newobject.attrs[key] = value
-        return newobject
 
     def transformedpointlist(self, matrix):
         '''Not intended to be called by end users.'''
@@ -76,11 +56,11 @@ class TransformMixin(object):
             self.XY = self.transformedpoint(matrix)
         else:
             self.pointList = self.transformedpointlist(matrix)
-            if isinstance(self, BezierMixin): self.pointsetList = self.transformedpointsetlist(matrix)
+            if isinstance(self, BezierObject): self.pointsetList = self.transformedpointsetlist(matrix)
             hittarget = getattr(self, "hitTarget", None)
             if hittarget:
                 hittarget.pointList = self.pointList
-                if isinstance(self, BezierMixin): hittarget.pointsetList = self.pointsetList
+                if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
                 hittarget.update()
         self.update()
 
@@ -377,44 +357,9 @@ class TransformHandle(PointObject):
         else:
             self.owner.attrs["transform"] = transformstring
 
-class LineObject(LineObject, TransformMixin):
-    pass
-
-class PolylineObject(PolylineObject, TransformMixin):
-    pass
-
-class PolygonObject(PolygonObject, TransformMixin):
-    pass
-
-class RectangleObject(RectangleObject, TransformMixin):
-    pass
-
-class EllipseObject(EllipseObject, TransformMixin):
-    pass
-
-class CircleObject(CircleObject, TransformMixin):
-    pass
-
-class BezierObject(BezierObject, TransformMixin):
-    pass
-
-class ClosedBezierObject(ClosedBezierObject, TransformMixin):
-    pass
-
-class SmoothBezierObject(SmoothBezierObject, TransformMixin):
-    pass
-
-class SmoothClosedBezierObject(SmoothClosedBezierObject, TransformMixin):
-    pass
-
-class PointObject(PointObject, TransformMixin):
-    pass
-
-class RegularPolygon(RegularPolygon, TransformMixin):
-    pass
-
-class GroupObject(GroupObject, TransformMixin):
-    pass
-
-class CanvasObject(CanvasObject, TransformCanvasMixin):
-    pass
+classes = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, BezierObject,
+ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject, PointObject, RegularPolygon, GroupObject]
+for cls in classes:
+    cls.__bases__ = cls.__bases__ + (TransformMixin,)
+    #print(cls, cls.__bases__)
+CanvasObject.__bases__ = CanvasObject.__bases__ + (TransformCanvasMixin,)

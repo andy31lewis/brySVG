@@ -118,7 +118,6 @@ class DrawCanvasMixin(object):
             if isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
                 coords = self.getSVGcoords(event)
                 self.mouseOwner.appendPoint(coords)
-                print("Appended a point")
         else:
             self.startx = self.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = self.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -131,13 +130,13 @@ class DrawCanvasMixin(object):
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
             if event.type == "dblclick":
                 svgobj.deletePoints(-2, None)
-                print("Deleted last 2 points")
+                #print("Deleted last 2 points")
             elif self.mouseDetected:
                 svgobj.deletePoints(-1, None)
-                print("Deleted last point")
+                #print("Deleted last point")
             elif svgobj.pointList[0] == svgobj.pointList[1]:
                 svgobj.deletePoints(None, 1)
-                print("deleted first point")
+                #print("deleted first point")
             while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
                 svgobj.deletePoints(-1, None)
             if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
@@ -220,7 +219,6 @@ class DrawCanvasMixin(object):
         clickpoint = self.getSVGcoords(event)
         svgobject = self.selectedObject
         svgobject.insertPoint(index, clickpoint)
-        svgobject.updatehittarget()
         self.createHandles(svgobject)
         return index, clickpoint
 
@@ -357,43 +355,16 @@ class ControlHandle(PointObject):
             self.linkedHandle.XY = newothercoords
         self.owner.setPointset(self.index, pointset)
 
-class LineObject(LineObject, NonBezierMixin):
-    pass
-
-class PolylineObject(PolylineObject, NonBezierMixin, PolyshapeMixin):
-    pass
-
-class PolygonObject(PolygonObject, NonBezierMixin, PolyshapeMixin):
-    pass
-
-class RectangleObject(RectangleObject, NonBezierMixin):
-    pass
-
-class EllipseObject(EllipseObject, NonBezierMixin):
-    pass
-
-class CircleObject(CircleObject, NonBezierMixin):
-    pass
-
-class BezierObject(BezierObject, BezierMixin):
-    pass
-
-class ClosedBezierObject(ClosedBezierObject, BezierMixin):
-    pass
-
-class SmoothBezierObject(SmoothBezierObject, BezierMixin):
-    pass
-
-class SmoothClosedBezierObject(SmoothClosedBezierObject, BezierMixin):
-    pass
-
-class RegularPolygon(RegularPolygon, NonBezierMixin):
-    pass
-
-class CanvasObject(CanvasObject, DrawCanvasMixin):
-    pass
-
-shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
-"bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}
-
+nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject]
+for cls in nonbezier:
+    cls.__bases__ = cls.__bases__ + (NonBezierMixin,)
+    #print(cls, cls.__bases__)
+polyshape = [PolylineObject, PolygonObject]
+for cls in polyshape:
+    cls.__bases__ = cls.__bases__ + (PolyshapeMixin,)
+    #print(cls, cls.__bases__)
+bezier = [BezierObject, ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject]
+for cls in bezier:
+    cls.__bases__ = cls.__bases__ + (BezierMixin,)
+    #print(cls, cls.__bases__)
+CanvasObject.__bases__ = CanvasObject.__bases__ + (DrawCanvasMixin,)
