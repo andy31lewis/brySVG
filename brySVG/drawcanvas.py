@@ -177,9 +177,9 @@ class DrawCanvasMixin(object):
     def createEditHitTargets(self):
         objlist = list(self.objectDict.values())
         for obj in objlist:
-            if obj.fixed: continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
+            if obj.fixed: continue
             if isinstance(obj, (PolyshapeMixin, BezierMixin)):
                 newobj = HitTarget(obj, self)
             else:
@@ -198,6 +198,8 @@ class DrawCanvasMixin(object):
         if not svgobject or svgobject.fixed: return
         self.selectedObject = svgobject
         self.createHandles(svgobject)
+        if self.tool == "insertpoint":
+            index, point = self.insertPoint(event)
 
     def createHandles(self, svgobject):
         if isinstance(svgobject, BezierMixin):
@@ -340,6 +342,9 @@ class Handle(PointObject):
     def select(self, event):
         if event.type == "mousedown" and event.button > 0: return
         event.stopPropagation()
+        if self.canvas.tool == "deletepoint":
+            self.canvas.deletePoint(self.index)
+            return
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         self.canvas.mouseOwner = self

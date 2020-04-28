@@ -42,7 +42,7 @@ class ObjectMixin(object):
             if not attr: continue
             newattr = attr[:] if isinstance(attr, list) else attr
             setattr(newobject, attrname, newattr)
-       for (key, value) in self.attrs.items():
+        for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         newobject.id = ""
         return newobject
@@ -781,9 +781,9 @@ class CanvasObject(svg.svg):
     def createHitTargets(self):
         objlist = list(self.objectDict.values())
         for obj in objlist:
-            if obj.style.fill != "none" or obj.fixed: continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
+            if obj.style.fill != "none" or obj.fixed: continue
             newobj = obj.cloneObject()
             newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
             newobj.style.opacity = 0
