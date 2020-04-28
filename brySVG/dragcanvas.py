@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2018 Andy Lewis                                          #
+# Copyright (c) 2014-2020 Andy Lewis                                          #
 # --------------------------------------------------------------------------- #
 # This program is free software; you can redistribute it and/or modify it     #
 # under the terms of the GNU General Public License version 2 as published by #
@@ -16,6 +16,7 @@ from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
 mouseDetected = False
 lasttaptime = 0
+fixeddefault = False
 
 class Enum(list):
     def __init__(self, name, string):
@@ -35,25 +36,13 @@ class ObjectMixin(object):
         '''Returns a clone of an object, including the extra functionality provided by this module.
         If that functionality is not needed, it is better to call the DOM method cloneNode(object) on the CanvasObject,
         as that is much faster'''
-        if isinstance(self, GroupObject):
-            newobject = GroupObject()
-            for obj in self.ObjectList:
-                newobj = obj.cloneObject()
-                newobject.addObject(newobj)
-            return newobject
-        for objecttype in shapetypes.values():
-            if isinstance(self, objecttype):
-                newobject = objecttype()
-                break
-        else:
-            return None
-        if isinstance(self, PointObject):
-            newobject.XY = self.XY
-        else:
-            newobject.pointList = self.pointList[:]
-            if isinstance(self, BezierObject): newobject.pointsetList = self.pointsetList[:]
-        if hasattr(self, "angle"): newobject.angle = self.angle
-        for (key, value) in self.attrs.items():
+        newobject = self.__class__()
+        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "canvas"]:
+            attr = getattr(self, attrname, None)
+            if not attr: continue
+            newattr = attr[:] if isinstance(attr, list) else attr
+            setattr(newobject, attrname, newattr)
+       for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         newobject.id = ""
         return newobject
@@ -118,14 +107,14 @@ class LineObject(svg.line, ObjectMixin):
         self.attrs["x2"] = x2
         self.attrs["y2"] = y2
 
-class TextObject(svg.text):
+class TextObject(svg.text, ObjectMixin):
     '''A multiline textbox.  Use "\n" within string to separate lines. To make sure the font-size is not affected by the scaling of the
     canvas, set ignorescaling to True, and specify the canvas on which the object will be placed.
     The box is placed at the coordinates given by anchorpoint; the anchorposition can be from 1 to 9:
     1  2  3  ie if anchorposition is 1, the anchorpoint is top-left, if it is 5 it is in the centre of the box, etc
     4  5  6
     7  8  9'''
-    def __init__(self, string, anchorpoint, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None):
+    def __init__(self, string="", anchorpoint=(0,0), anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None):
         (x, y) = anchorpoint
         stringlist = string.split("\n")
         rowcount = len(stringlist)
@@ -462,26 +451,33 @@ class GroupObject(svg.g, ObjectMixin):
     def __init__(self, objlist=[]):
         svg.g.__init__(self)
         if not isinstance(objlist, list): objlist = [objlist]
-        self.ObjectList = []
+        self.objectList = []
         for obj in objlist:
             self.addObject(obj)
-        self._Canvas = None
-        self.Group = None
+        self._canvas = None
 
-    def addObject(self, svgobject, objid=None, fixed=False):
+    def addObject(self, svgobject, objid=None):
         self <= svgobject
         if objid: svgobject.attrs["id"] = objid
-        if not hasattr(svgobject, "fixed"): svgobject.fixed = fixed
-        svgobject.Group = self
-        self.ObjectList.append(svgobject)
+        svgobject.group = self
+        self.objectList.append(svgobject)
 
-    def addObjects(self, objectlist, fixed=False):
-        for obj in objectlist: self.addObject(obj, fixed=fixed)
+    def addObjects(self, objectlist):
+        for obj in objectlist: self.addObject(obj)
 
     def deleteAll(self):
         while self.firstChild:
             self.removeChild(self.firstChild)
-        self.ObjectList = []
+        self.objectList = []
+
+    def cloneObject(self):
+        '''Clones the group.'''
+        newobject = GroupObject()
+        for obj in self.objectList:
+            if isinstance(obj, ObjectMixin):
+                newobj = obj.cloneObject()
+                newobject.addObject(newobj)
+        return newobject
 
     @property
     def canvas(self):
@@ -490,8 +486,16 @@ class GroupObject(svg.g, ObjectMixin):
     @canvas.setter
     def canvas(self, canvas):
         self._canvas = canvas
-        for obj in self.ObjectList:
-            obj.canvas = canvas
+        for obj in self.objectList: obj.canvas = canvas
+
+    @property
+    def fixed(self):
+        return self._fixed
+
+    @fixed.setter
+    def fixed(self, fixedvalue):
+        self._fixed = fixedvalue
+        for obj in self.objectList: obj.fixed = fixedvalue
 
 class Button(GroupObject):
     '''A clickable button with (multiline) text on it. If fontsize is not specified, the text will be scaled to fit
@@ -505,7 +509,8 @@ class Button(GroupObject):
         rowcount = text.count("\n") + 1
         if not fontsize: fontsize = height*0.8/rowcount
         text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
-        self.addObjects([self.button, text], fixed=True)
+        self.addObjects([self.button, text])
+        self.fixed = True
         self.bind("mousedown", self.onMouseDown)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)
@@ -534,7 +539,8 @@ class ImageButton(GroupObject):
             canvas.removeChild(image)
             scalefactor = min(width/bbox.width, height/bbox.height)*0.7
             image.attrs["transform"] += " scale({})".format(scalefactor)
-        self.addObjects([self.button, image], fixed=True)
+        self.addObjects([self.button, image])
+        self.fixed = True
         self.bind("mousedown", self.onMouseDown)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)
@@ -632,7 +638,7 @@ class CanvasObject(svg.svg):
         self.bind("touchend", self.onLeftUp)
         self.bind("dragstart", self.onDragStart)
         self.bind("dblclick", self.onDoubleClick)
-        document.bind("keydown", self.deleteSelection)
+        document.bind("keydown", self.onKeyDown)
 
     def setDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
@@ -666,21 +672,21 @@ class CanvasObject(svg.svg):
         SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
         return Point((SVGpt.x, SVGpt.y))
 
-    def addObject(self, svgobject, objid=None, fixed=False):
+    def addObject(self, svgobject, objid=None, fixed=fixeddefault):
         '''Adds an object to the canvas, and also adds it to the canvas's objectDict so that it can be referenced
         using canvas.objectDict[id]. This is also needed for the object to be capable of being snapped to.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
         If it is not desired that an object should be in the objectDict, just add it to the canvas using Brython's <= method.'''
-        def AddToDict(svgobj, fixed):
+        def AddToDict(svgobj):
             if not svgobj.id: svgobj.id = "id"+str(len(self.objectDict))
             self.objectDict[svgobj.id] = svgobj
-            if not hasattr(svgobj, "fixed"): svgobj.fixed = fixed
             if isinstance(svgobj, GroupObject):
-                for obj in svgobj.ObjectList:
-                    AddToDict(obj, fixed)
+                for obj in svgobj.objectList:
+                    AddToDict(obj)
         if objid: svgobject.id = objid
+        if not hasattr(svgobject, "fixed"): svgobject.fixed = fixed
         self <= svgobject
-        AddToDict(svgobject, fixed)
+        AddToDict(svgobject)
         svgobject.canvas = self
         return svgobject
 
@@ -699,16 +705,15 @@ class CanvasObject(svg.svg):
             self.removeChild(self.firstChild)
         self.objectDict = {}
 
-    def deleteSelection(self,event):
+    def deleteSelection(self):
         '''Delete the currently selected object'''
-        if event.keyCode == 46:
-            if self.selectedObject:
-                if self.handles: self.deleteObject(self.handles)
-                if self.controlhandles: self.deleteObject(self.controlhandles)
-                hittarget = getattr(self.selectedObject, "hitTarget", None)
-                if hittarget: self.deleteObject(hittarget)
-                self.deleteObject(self.selectedObject)
-                self.selectedObject = self.handles = self.controlhandles = None
+        if self.selectedObject:
+            if self.handles: self.deleteObject(self.handles)
+            if self.controlhandles: self.deleteObject(self.controlhandles)
+            hittarget = getattr(self.selectedObject, "hitTarget", None)
+            if hittarget: self.deleteObject(hittarget)
+            self.deleteObject(self.selectedObject)
+            self.selectedObject = self.handles = self.controlhandles = None
 
     def rotateElement(self, element, angle, centre=None):
         '''Rotate an element clockwise by angle degrees around centre.
@@ -743,7 +748,7 @@ class CanvasObject(svg.svg):
         functionality provided by this module - ie the shape will still be able to be selected, dragged, etc.'''
         offset = Point(offset)
         if isinstance(svgobject, GroupObject):
-            for obj in svgobject.ObjectList:
+            for obj in svgobject.objectList:
                 self.translateObject(obj, offset)
         elif isinstance(svgobject, PointObject):
             svgobject.XY += offset
@@ -846,6 +851,9 @@ class CanvasObject(svg.svg):
     def onDoubleClick(self,event):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
 
+    def onKeyDown(self, event):
+        if event.keyCode == 46: self.deleteSelection()
+
     def prepareDrag(self, event):
         self.selectedObject = self.getSelectedObject(event.target.id)
         if self.selectedObject and not self.selectedObject.fixed:
@@ -883,8 +891,8 @@ class CanvasObject(svg.svg):
         except AttributeError:
             pass
         if getGroup:
-            while getattr(svgobj, "Group", None):
-                svgobj = svgobj.Group
+            while getattr(svgobj, "group", None):
+                svgobj = svgobj.group
         return svgobj
 
     def doSnap(self, svgobject):

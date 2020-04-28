@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2018 Andy Lewis                                          #
+# Copyright (c) 2014-2020 Andy Lewis                                          #
 # --------------------------------------------------------------------------- #
 # This program is free software; you can redistribute it and/or modify it     #
 # under the terms of the GNU General Public License version 2 as published by #
@@ -67,7 +67,7 @@ class TransformMixin(object):
     def translate(self, vector):
         '''Translate object by vector'''
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.translate(vector)
         else:
             t = svgbase.createSVGTransform()
@@ -81,7 +81,7 @@ class TransformMixin(object):
             bbox = self.getBBox()
             centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.rotate(angle, centre)
         else:
             if isinstance(self, (EllipseObject, RectangleObject)):
@@ -94,7 +94,7 @@ class TransformMixin(object):
         '''Rotate object clockwise by the angle between vec1 and vec2 around centre.
         If centre is not given, it is the origin.'''
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.rotateByVectors(vec1, vec2, centre)
         else:
             (cx, cy) = centre
@@ -114,7 +114,7 @@ class TransformMixin(object):
         '''Stretch object in the x-direction by scale factor xscale, with invariant line x = cx.
         If cx is not given, the invariant line is the y-axis.'''
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.xstretch(xscale, cx)
         else:
             angle = 0
@@ -132,7 +132,7 @@ class TransformMixin(object):
         '''Stretch object in the y-direction by scale factor yscale, with invariant line y = cy.
         If cy is not given, the invariant line is the x-axis.'''
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.ystretch(yscale, cy)
         else:
             angle = 0
@@ -150,7 +150,7 @@ class TransformMixin(object):
         '''Enlarge object by scale factor scalefactor, from centre.
         If cx and cy are not given, the centre is the origin.'''
         if isinstance(self, GroupObject):
-            for obj in self.ObjectList:
+            for obj in self.objectList:
                 obj.enlarge(scalefactor, centre)
         else:
             (cx, cy) = centre

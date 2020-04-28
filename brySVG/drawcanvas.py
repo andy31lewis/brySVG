@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2018 Andy Lewis                                          #
+# Copyright (c) 2014-2020 Andy Lewis                                          #
 # --------------------------------------------------------------------------- #
 # This program is free software; you can redistribute it and/or modify it     #
 # under the terms of the GNU General Public License version 2 as published by #
@@ -36,9 +36,13 @@ class PolyshapeMixin(object):
         self.update()
         self.updatehittarget()
 
+    def deletePoint(self, index):
+        self.deletePoints(index, index+1)
+
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
         self.update()
+        self.updatehittarget()
 
 class BezierMixin(object):
     '''Methods for all types of BezierObject. The parameters point, pointlist, pointset etc should be (lists of) Point object(s).'''
@@ -72,6 +76,7 @@ class BezierMixin(object):
         del self.pointList[slice(start, end)]
         self.pointsetList = self.getpointsetlist(self.pointList)
         self.update()
+        self.updatehittarget()
 
     def insertPoint(self, index, point):
         self.pointList.insert(index, point)
@@ -79,11 +84,34 @@ class BezierMixin(object):
             self.pointsetList = self.getpointsetlist(self.pointList)
         else:
             L = len(self.pointList)
-            cpoint1, cpoint2 = SmoothBezierMixin.calculatecontrolpoints(self, self.pointList[index-1:index+2])
+            triple = [self.pointList[index-1], point, self.pointList[(index+1)%L]]
+            cpoint1, cpoint2 = SmoothBezierMixin.calculatecontrolpoints(self, triple)
             #cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
             self.pointsetList.insert(index, [cpoint1, point, cpoint2])
             self.pointsetList[index-1][2] = cpoint1
             self.pointsetList[(index+1)%L][0] = cpoint2
+        self.update()
+        self.updatehittarget()
+
+    def deletePoint(self, index):
+        point = self.pointList[index]
+        del self.pointList[index]
+        if isinstance(self, SmoothBezierMixin):
+            self.pointsetList = self.getpointsetlist(self.pointList)
+        else:
+            L = len(self.pointsetList)
+            #triple = [self.pointList[index-1], point, self.pointList[(index+1)%L]]
+            #cpoint1, cpoint2 = SmoothBezierMixin.calculatecontrolpoints(self, triple)
+            #cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
+            #self.pointsetList.insert(index, [cpoint1, point, cpoint2])
+            if index == 0 and self.pointsetList[index][0] is None:
+                self.pointsetList[index+1][0] = None
+            elif index == L-1 and self.pointsetList[index][2] is None:
+                self.pointsetList[index-1][2] = None
+            else:
+                self.pointsetList[(index-1)%L][2] = point
+                self.pointsetList[(index+1)%L][0] = point
+            del self.pointsetList[index]
         self.update()
         self.updatehittarget()
 
@@ -221,6 +249,19 @@ class DrawCanvasMixin(object):
         svgobject.insertPoint(index, clickpoint)
         self.createHandles(svgobject)
         return index, clickpoint
+
+    def deletePoint(self, index):
+        if not self.selectedObject: return None
+        if not isinstance(self.selectedObject, (PolyshapeMixin, BezierObject)): return None
+        svgobject = self.selectedObject
+        if len(svgobject.pointList) <= 2:
+            self.deleteSelection()
+            return None
+        self.deleteObject(self.handles)
+        self.deleteObject(self.controlhandles)
+        svgobject.deletePoint(index)
+        self.createHandles(svgobject)
+        return index
 
     def endEdit(self, event):
         if self.selectedObject:
