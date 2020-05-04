@@ -14,7 +14,6 @@ from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot
 svgbase = svg.svg()
-mouseDetected = False
 lasttaptime = 0
 fixeddefault = False
 
@@ -36,7 +35,12 @@ class ObjectMixin(object):
         '''Returns a clone of an object, including the extra functionality provided by this module.
         If that functionality is not needed, it is better to call the DOM method cloneNode(object) on the CanvasObject,
         as that is much faster'''
-        newobject = self.__class__()
+        for objecttype in shapetypes.values():
+            if isinstance(self, objecttype):
+                newobject = objecttype()
+                break
+        else:
+            return None
         for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "canvas"]:
             attr = getattr(self, attrname, None)
             if not attr: continue
@@ -270,7 +274,7 @@ class CircleObject(svg.circle, ObjectMixin):
 
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
-    EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be stright lines)
+    EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be straight lines)
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
     (previous-control-point, vertex, next-control-point).
     For the first vertex, the previous-control-point must be None,
