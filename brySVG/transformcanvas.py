@@ -52,7 +52,11 @@ class TransformMixin(object):
 
     def matrixTransform(self, matrix):
         '''Transform object using a SVGmatrix'''
-        if isinstance(self, PointObject):
+        if isinstance(self, GroupObject):
+            for obj in self.objectList:
+                obj.matrixTransform(matrix)
+            return
+        elif isinstance(self, PointObject):
             self.XY = self.transformedpoint(matrix)
         else:
             self.pointList = self.transformedpointlist(matrix)
@@ -66,13 +70,9 @@ class TransformMixin(object):
 
     def translate(self, vector):
         '''Translate object by vector'''
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.translate(vector)
-        else:
-            t = svgbase.createSVGTransform()
-            t.setTranslate(*vector)
-            self.matrixTransform(t.matrix)
+        t = svgbase.createSVGTransform()
+        t.setTranslate(*vector)
+        self.matrixTransform(t.matrix)
 
     def rotate(self, angle, centre=None):
         '''Rotate object clockwise by angle degrees around centre.
@@ -80,85 +80,74 @@ class TransformMixin(object):
         if not centre:
             bbox = self.getBBox()
             centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.rotate(angle, centre)
-        else:
-            if isinstance(self, (EllipseObject, RectangleObject)):
-                self.angle += angle
-            t = svgbase.createSVGTransform()
-            t.setRotate(angle, *centre)
-            self.matrixTransform(t.matrix)
+        if isinstance(self, (EllipseObject, RectangleObject)):
+            self.angle += angle
+        t = svgbase.createSVGTransform()
+        t.setRotate(angle, *centre)
+        self.matrixTransform(t.matrix)
+
+    def rotateandtranslate(self, angle, centre=None, vector=(0,0)):
+        if not centre:
+            bbox = self.getBBox()
+            centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
+        t = svgbase.createSVGTransform()
+        if angle != 0: t.setRotate(angle, *centre)
+        M = t.matrix.translate(*vector) if vector != (0,0) else t.matrix
+        self.matrixTransform(M)
 
     def rotateByVectors(self, vec1, vec2, centre=(0, 0)):
         '''Rotate object clockwise by the angle between vec1 and vec2 around centre.
         If centre is not given, it is the origin.'''
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.rotateByVectors(vec1, vec2, centre)
-        else:
-            (cx, cy) = centre
-            (x1, y1) = vec1
-            (x2, y2) = vec2
-            (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
-            angle = atan2(y3, x3)*180/pi
-            if isinstance(self, (EllipseObject, RectangleObject)):
-                self.angle += angle
-            matrix = svgbase.createSVGMatrix()
-            matrix = matrix.translate(cx, cy)
-            matrix = matrix.rotateFromVector(x3, y3)
-            matrix = matrix.translate(-cx, -cy)
-            self.matrixTransform(matrix)
+        (cx, cy) = centre
+        (x1, y1) = vec1
+        (x2, y2) = vec2
+        (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
+        angle = atan2(y3, x3)*180/pi
+        if isinstance(self, (EllipseObject, RectangleObject)):
+            self.angle += angle
+        matrix = svgbase.createSVGMatrix()
+        matrix = matrix.translate(cx, cy)
+        matrix = matrix.rotateFromVector(x3, y3)
+        matrix = matrix.translate(-cx, -cy)
+        self.matrixTransform(matrix)
 
     def xstretch(self, xscale, cx=0):
         '''Stretch object in the x-direction by scale factor xscale, with invariant line x = cx.
         If cx is not given, the invariant line is the y-axis.'''
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.xstretch(xscale, cx)
-        else:
-            angle = 0
-            if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
-                angle = self.angle
-                self.rotate(-angle)
-            matrix = svgbase.createSVGMatrix()
-            matrix = matrix.translate(cx, 0)
-            matrix.a = xscale
-            matrix = matrix.translate(-cx, 0)
-            self.matrixTransform(matrix)
-            if angle != 0: self.rotate(angle)
+        angle = 0
+        if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+            angle = self.angle
+            self.rotate(-angle)
+        matrix = svgbase.createSVGMatrix()
+        matrix = matrix.translate(cx, 0)
+        matrix.a = xscale
+        matrix = matrix.translate(-cx, 0)
+        self.matrixTransform(matrix)
+        if angle != 0: self.rotate(angle)
 
     def ystretch(self, yscale, cy=0):
         '''Stretch object in the y-direction by scale factor yscale, with invariant line y = cy.
         If cy is not given, the invariant line is the x-axis.'''
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.ystretch(yscale, cy)
-        else:
-            angle = 0
-            if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
-                angle = self.angle
-                self.rotate(-angle)
-            matrix = svgbase.createSVGMatrix()
-            matrix = matrix.translate(0, cy)
-            matrix.d = yscale
-            matrix = matrix.translate(0, -cy)
-            self.matrixTransform(matrix)
-            if angle != 0: self.rotate(angle)
+        angle = 0
+        if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+            angle = self.angle
+            self.rotate(-angle)
+        matrix = svgbase.createSVGMatrix()
+        matrix = matrix.translate(0, cy)
+        matrix.d = yscale
+        matrix = matrix.translate(0, -cy)
+        self.matrixTransform(matrix)
+        if angle != 0: self.rotate(angle)
 
     def enlarge(self, scalefactor, centre):
         '''Enlarge object by scale factor scalefactor, from centre.
         If cx and cy are not given, the centre is the origin.'''
-        if isinstance(self, GroupObject):
-            for obj in self.objectList:
-                obj.enlarge(scalefactor, centre)
-        else:
-            (cx, cy) = centre
-            matrix = svgbase.createSVGMatrix()
-            matrix = matrix.translate(cx, cy)
-            matrix = matrix.scale(scalefactor)
-            matrix = matrix.translate(-cx, -cy)
-            self.matrixTransform(matrix)
+        (cx, cy) = centre
+        matrix = svgbase.createSVGMatrix()
+        matrix = matrix.translate(cx, cy)
+        matrix = matrix.scale(scalefactor)
+        matrix = matrix.translate(-cx, -cy)
+        self.matrixTransform(matrix)
 
 class TransformCanvasMixin(object):
     def prepareTransform(self, event):
@@ -192,9 +181,8 @@ class TransformCanvasMixin(object):
             elif transformtype == TransformType.ENLARGE:
                 self.selectedObject.enlarge(hypot(x2, y2)/hypot(x1, y1), (cx, cy))
 
-            if self.snap:
-                if self.rotateSnap: self.doRotateSnap(self.selectedObject)
-                else: self.doSnap(self.selectedObject)
+            if self.edgeSnap: self.doEdgeSnap(self.selectedObject)
+            elif self.vertexSnap: self.doVertexSnap(self.selectedObject)
 
         if self.transformorigin:
             self.deleteObject(self.transformorigin)
@@ -203,7 +191,7 @@ class TransformCanvasMixin(object):
         self.mouseOwner = None
 
     def showTransformHandles(self, svgobj):
-        tempgroup = GroupObject([svgobj.cloneNode(True)])
+        tempgroup = GroupObject([svgobj.cloneNode(True)]) #Needed to overcome bug in browser getBBox implementations
         self <= tempgroup
         bbox = tempgroup.getBBox()
         x1, y1, x2, y2 = bbox.x, bbox.y, bbox.x+bbox.width, bbox.y+bbox.height
@@ -252,49 +240,6 @@ class TransformCanvasMixin(object):
             if self.mouseMode == MouseMode.TRANSFORM: dx, dy = x-self.startx, y-self.starty
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
             self.mouseOwner.movePoint((dx, dy))
-
-    def doRotateSnap(self, svgobject):
-        if not hasattr(svgobject, "pointList"): return
-        bbox = svgobject.getBBox()
-        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-        bestdx = bestdy = None
-        for objid in self.objectDict:
-            if objid == svgobject.id: continue
-            obj = self.objectDict[objid]
-            if not hasattr(obj, "pointList"): continue
-            bbox = obj.getBBox()
-            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-            if L1-R > self.snap or R1-L < -self.snap or T1-B > self.snap or B1-T < -self.snap: continue
-            for point1 in obj.pointList:
-                for point2 in svgobject.pointList:
-                    (dx, dy) = point1 - point2
-                    if abs(dx) < self.snap and abs(dy) < self.snap:
-                        pl1 = self.objectDict[objid].pointList
-                        L = len(pl1)
-                        i = pl1.index(point1)
-                        vec1a = pl1[(i+1)%L] - point1
-                        vec1b = pl1[(i-1)%L] - point1
-                        angles1 = [vec1a.angle(), vec1b.angle()]
-                        pl2 = svgobject.pointList
-                        L = len(pl2)
-                        j = pl2.index(point2)
-                        vec2a = pl2[(j+1)%L] - point2
-                        vec2b = pl2[(j-1)%L] - point2
-                        angles2 = [vec2a.angle(), vec2b.angle()]
-                        for a1 in angles1:
-                            for a2 in angles2:
-                                diff = a1-a2
-                                absdiff = abs(diff)
-                                testdiff = absdiff if absdiff < pi else 2*pi-absdiff
-
-                                if testdiff < self.rotateSnap*pi/180:
-                                    svgobject.rotate(diff*180/pi)
-                                    (dx, dy) = self.objectDict[objid].pointList[i] - svgobject.pointList[j]
-                                    svgobject.translate((dx, dy))
-                                    return
-                        if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy): (bestdx, bestdy) = (dx, dy)
-        if bestdx:
-            svgobject.translate((bestdx, bestdy))
 
 class TransformHandle(PointObject):
     def __init__(self, owner, transformtype, coords, canvas):
