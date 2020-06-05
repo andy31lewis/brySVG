@@ -1000,12 +1000,31 @@ class Point(object):
     def __len__(self):
         return len(self.coords)
 
+    def __lt__(self, other):
+        return self.coords < other.coords
+
     def length(self):
         (x, y) = self.coords
         return hypot(x, y)
 
     def angle(self):
         return atan2(self.coords[1], self.coords[0])
+
+    def anglefrom(self, other):
+        dot = other*self
+        cross = other.cross(self)
+        if cross == 0: cross = -0.0
+        angle = atan2(cross, dot)
+        return angle
+
+    def cross(self, other):
+        x1, y1 = self.coords
+        x2, y2 = other.coords
+        return x1*y2 - y1*x2
+
+    def roundsf(self, sf):
+        x, y = self.coords
+        return Point((roundsf(x, sf), roundsf(y, sf)))
 
 class Matrix(object):
     def __init__(self, rows):
@@ -1020,6 +1039,10 @@ class Matrix(object):
             return [Point([p*col for col in self.cols]) for p in other]
         else:
             return Point([other*col for col in self.cols])
+
+def roundsf(x, sf=3):
+    if x == 0: return 0
+    return round(x, sf-int(floor(log10(abs(x))))-1)
 
 shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
 "rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
