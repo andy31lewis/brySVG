@@ -12,7 +12,7 @@
 import time
 from browser import document, alert
 import browser.svg as svg
-from math import sin, cos, atan2, pi, hypot
+from math import sin, cos, atan2, pi, hypot, floor, log10
 svgbase = svg.svg()
 lasttaptime = 0
 fixeddefault = False
@@ -569,10 +569,10 @@ class CanvasObject(svg.svg):
 
     canvas.mouseMode = MouseMode.DRAG
         Objects can be dragged around on the canvas.
-        canvas.snap: set to a number of pixels. After a drag, if a vertex of the transformed object is within
-            this many pixels of a vertex of another object in the canvas's objectDict, the transformed object is snapped
-            so that the vertices coincide. (If more than one pair of vertices are below the snap threshold, the closest pair are used.
-            If canvas.snap is set to None (the default), no snapping will be done.
+        canvas.vertexSnap and canvas.snapDistance: If vertexSnap is set to True, then after a drag, if a vertex of the
+        dragged object is within snapDistance (default is 10) pixels of a vertex of another object in the canvas's objectDict,
+        the dragged object is snapped so that the vertices coincide.
+        (If more than one pair of vertices are below the snap threshold, the closest pair are used.)
 
     canvas.mouseMode = MouseMode.TRANSFORM
         ***To enable this mode, use import transformcanvas or import fullcanvas instead of import dragcanvas***
@@ -580,10 +580,6 @@ class CanvasObject(svg.svg):
         and a number of handles (which ones can be controlled by setting canvas.transformTypes to the list of transforms
         required. By default, canvas.transformTypes includes:
         [TransformType.TRANSLATE, TransformType.ROTATE, TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]
-        canvas.rotateSnap: set to a number of degrees. After a transform, if a snap is to be done, and the edges
-            of the two shapes at the vertex to be snapped are within this many degrees of each other,
-            the transformed shape will be rotated so that the edges coincide.
-            If canvas.rotateSnap is set to None (the default), no rotating will be done.
 
     canvas.mouseMode = MouseMode.DRAW
         ***To enable this mode, use import drawcanvas or import fullcanvas instead of import dragcanvas***
@@ -611,8 +607,10 @@ class CanvasObject(svg.svg):
         #Attributes intended to be read/write for users - see above for usage
         self.mouseMode = MouseMode.DRAG
         self.transformTypes = TransformType
-        self.snap = None
-        self.rotateSnap = None
+        self.vertexSnap = False
+        self.snapDistance = 10
+        self.edgeSnap = False
+        self.snapAngle = 10
         self.tool = "select"
         self.penColour = "black"
         self.fillColour  = "yellow"
@@ -880,9 +878,8 @@ class CanvasObject(svg.svg):
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
         self.translateObject(self.mouseOwner, offset)
-        if self.snap:
-            if self.rotateSnap: self.doRotateSnap(self.mouseOwner)
-            else: self.doSnap(self.mouseOwner)
+        if self.edgeSnap: self.doEdgeSnap(self.mouseOwner)
+        elif self.vertexSnap: self.doVertexSnap(self.mouseOwner)
         self.mouseOwner = None
 
     def getSelectedObject(self, objectid, getGroup = True):
@@ -899,33 +896,49 @@ class CanvasObject(svg.svg):
                 svgobj = svgobj.group
         return svgobj
 
-    def doSnap(self, svgobject):
+    def doVertexSnap(self, svgobject):
+        tt = time.time()
         if not hasattr(svgobject, "pointList"): return
+        snapd = self.snapDistance
+        bestdx = bestdy = bestd = None
+        objpoints = sorted(svgobject.pointList, key=lambda p:p.coords)
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-        bestdx = bestdy = None
+
+        checkpoints = []
         for objid in self.objectDict:
             if objid == svgobject.id: continue
             obj = self.objectDict[objid]
             if not hasattr(obj, "pointList"): continue
             bbox = obj.getBBox()
             L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-            if L1-R > self.snap or R1-L < -self.snap or T1-B > self.snap or B1-T < -self.snap: continue
-            for point1 in obj.pointList:
-                for point2 in svgobject.pointList:
-                    (dx, dy) = point1 - point2
-                    if abs(dx) < self.snap and abs(dy) < self.snap:
-                        if not bestdx or hypot(dx, dy) < hypot(bestdx, bestdy):
-                            (bestdx, bestdy) = (dx, dy)
-        if bestdx or bestdy:
-            self.translateObject(svgobject, Point((bestdx, bestdy)))
+            if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
+            checkpoints.extend(obj.pointList)
+        checkpoints.sort(key=lambda p:p.coords)
+        checkstart = 0
+        for i, point1 in enumerate(objpoints):
+            checkpoints = checkpoints[checkstart:]
+            if not checkpoints: break
+            try:
+                (tonextx, y) = objpoints[i+1] - point1
+            except IndexError:
+                tonextx = 0
+            checkstart = 0
+            for point2 in checkpoints:
+                (dx, dy) = point2 - point1
+                if abs(dx) < snapd and abs(dy) < snapd:
+                    d = hypot(dx, dy)
+                    if bestd is None or d < bestd: (bestd, bestdx, bestdy) = (d, dx, dy)
+                if tonextx - dx > snapd: checkstart += 1
+                if dx > snapd: break
+        if bestd: self.translateObject(svgobject, Point((bestdx, bestdy)))
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''
     def __init__(self, coords):
         self.coords = list(coords.coords) if isinstance(coords, Point) else list(coords)
 
-    def __str__(self):
+    def __repr__(self):
         return str(tuple(self.coords))
 
     def __eq__(self, other):
@@ -993,7 +1006,6 @@ class Point(object):
 
     def angle(self):
         return atan2(self.coords[1], self.coords[0])
-
 
 class Matrix(object):
     def __init__(self, rows):
