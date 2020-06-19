@@ -113,7 +113,7 @@ class LineObject(svg.line, ObjectMixin):
         else:
             dasharray = None
 
-        svg.line.__init__(self, x1=x1, y1=y1, x2=x2, y2=y2, style={"stroke":linecolour, "strokeDasharray":dasharray, "strokeWidth":linewidth})
+        svg.line.__init__(self, x1=x1, y1=y1, x2=x2, y2=y2, style={"stroke":linecolour, "strokeDasharray":dasharray, "stroke-width":linewidth})
         self.pointList = [Point(coords) for coords in pointlist]
 
     def update(self):
@@ -197,7 +197,7 @@ class PolylineObject(svg.polyline, ObjectMixin):
     '''Wrapper for SVG polyline. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none"):
-        svg.polyline.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.polyline.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.update()
 
@@ -208,7 +208,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
     '''Wrapper for SVG polygon. Parameter:
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        svg.polygon.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.polygon.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.update()
 
@@ -224,7 +224,7 @@ class RectangleObject(svg.rect, ObjectMixin):
     pointlist: a list of coordinates for two opposite vertices
     angle: an optional angle of rotation (clockwise, in degrees).'''
     def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
-        svg.rect.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.rect.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.angle = angle
         self.update()
@@ -249,7 +249,7 @@ class EllipseObject(svg.ellipse, ObjectMixin):
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
     and an optional angle of rotation (clockwise, in degrees).'''
     def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
-        svg.ellipse.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.ellipse.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.angle = angle
         self.update()
@@ -279,7 +279,7 @@ class CircleObject(svg.circle, ObjectMixin):
         else:
             (x, y) = centre
             self.pointList = [Point((x, y)), Point((x+radius, y))]
-        svg.circle.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.circle.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.update()
 
     def update(self):
@@ -298,7 +298,7 @@ class BezierObject(svg.path, ObjectMixin):
     def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none"):
         def toPoint(coords):
             return None if coords is None else Point(coords)
-        svg.path.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.path.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         if pointsetlist:
             self.pointList = [Point(pointset[1]) for pointset in pointsetlist]
         else:
@@ -335,7 +335,7 @@ class ClosedBezierObject(BezierObject):
     (previous-control-point, vertex, next-control-point).
     The path will be closed (the first vertex does not need to be repeated).'''
     def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
-        svg.path.__init__(self, style={"stroke":linecolour, "strokeWidth":linewidth, "fill":fillcolour})
+        svg.path.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         if pointsetlist:
             self.pointList = [Point(pointset[1]) for pointset in pointsetlist]
         else:
@@ -427,7 +427,7 @@ class PointObject(svg.circle, ObjectMixin):
     def __init__(self, XY=(0,0), colour="black", pointsize=2, canvas=None):
         (x, y) = XY
         sf = canvas.scaleFactor if canvas else 1
-        svg.circle.__init__(self, cx=x, cy=y, r=pointsize*sf, style={"stroke":colour, "strokeWidth":1, "fill":colour})
+        svg.circle.__init__(self, cx=x, cy=y, r=pointsize*sf, style={"stroke":colour, "stroke-width":1, "fill":colour, "vector-effect":"non-scaling-stroke"})
         self._XY = None
         self.XY = Point(XY)
 
@@ -632,7 +632,7 @@ class CanvasObject(svg.svg):
 
     def __init__(self, width, height, colour="white", objid=None):
         svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
-        if objid: self.id = objid
+        self.id = objid if objid else f"canvas{id(self)}"
         self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
         self.mouseMode = MouseMode.DRAG
@@ -645,6 +645,7 @@ class CanvasObject(svg.svg):
         self.penColour = "black"
         self.fillColour  = "yellow"
         self.penWidth = 3
+        self.lineWidthScaling = True
 
         #Attributes intended to be read-only for users
         self.scaleFactor = 1 #Multiply by this to convert CSS pixels to SVG units
@@ -653,6 +654,7 @@ class CanvasObject(svg.svg):
         self.selectedObject = None #The shape which was last clicked on or dragged
 
         #Attributes not intended to be used by end-users
+        self.nextid = 0
         self.objectDict = {}
         self.hittargets = []
         self.handles = None
@@ -675,6 +677,22 @@ class CanvasObject(svg.svg):
         self.bind("dblclick", self.onDoubleClick)
         document.bind("keydown", self.onKeyDown)
 
+    def setViewBox(self, pointlist):
+        '''Should be done after the canvas has been added to the page.
+        Returns the SVG coords of the top-left and bottom right of the canvas.'''
+        ((x1, y1), (x2, y2)) = pointlist
+        self.attrs["viewBox"] = f"{x1} {y1} {x2-x1} {y2-y1}"
+        self.scaleFactor = self.getScaleFactor()
+        bcr = self.getBoundingClientRect()
+        pt = self.createSVGPoint()
+        (pt.x, pt.y) = (bcr.left, bcr.top)
+        SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
+        (x1, y1) = (SVGpt.x, SVGpt.y)
+        (pt.x, pt.y) = (bcr.left+bcr.width, bcr.top+bcr.height)
+        SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
+        (x2, y2) = (SVGpt.x, SVGpt.y)
+        return ((x1, y1), (x2, y2))
+
     def setDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
         call this after adding to the page to set the SVG width and height attributes.'''
@@ -684,19 +702,19 @@ class CanvasObject(svg.svg):
         return bcr.width, bcr.height
 
     def fitContents(self):
-        '''Scales the canvas so that all the objects on it are visible.'''
+        '''Scales the canvas so that all the objects on it are visible. Returns the coords of the top-left and bottom-right.'''
         bbox = self.getBBox()
-        bboxstring = str(bbox.x-10)+" "+str(bbox.y-10)+" "+str(bbox.width+20)+" "+str(bbox.height+20)
-        self.attrs["viewBox"] = bboxstring
-        self.scaleFactor = self.getScaleFactor()
+        wmargin, hmargin = bbox.width/50, bbox.height/50
+        rectpointlist = self.setViewBox(((bbox.x-wmargin, bbox.y-hmargin), (bbox.x+bbox.width+wmargin, bbox.y+bbox.height+hmargin)))
         #self.attrs["preserveAspectRatio"] = "none"
+        return rectpointlist
 
     def getScaleFactor(self):
         '''Recalculates self.scaleFactor. This is called automatically by fitContents(), but should be called manually
          after zooming in or out of the canvas in some other way.'''
-        bcr = self.getBoundingClientRect()
+        width, height = self.setDimensions()
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
-        return max(vbwidth/bcr.width, vbheight/bcr.height)
+        return max(vbwidth/width, vbheight/height)
 
     def getSVGcoords(self, event):
         '''Converts mouse event coordinates to SVG coordinates'''
@@ -713,8 +731,12 @@ class CanvasObject(svg.svg):
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
         If it is not desired that an object should be in the objectDict, just add it to the canvas using Brython's <= method.'''
         def AddToDict(svgobj):
-            if not svgobj.id: svgobj.id = "id"+str(len(self.objectDict))
+            if not svgobj.id:
+                svgobj.id = f"{self.id}_id{self.nextid}"
+                self.nextid += 1
             self.objectDict[svgobj.id] = svgobj
+            if not getattr(svgobj.style, "vectorEffect", None): #If object already has vectorEffect set, leave it alone
+                if self.lineWidthScaling is False: svgobj.style.vectorEffect = "non-scaling-stroke" #Only set property if necessary
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.objectList:
                     AddToDict(obj)
@@ -727,14 +749,17 @@ class CanvasObject(svg.svg):
 
     def deleteObject(self, svgobject):
         '''Delete an object from the canvas'''
+        def deletefromdict(svgobj):
+            if isinstance(svgobj, GroupObject):
+                for obj in svgobj.objectList:
+                    deletefromdict(obj)
+            del self.objectDict[svgobj.id]
+
         if not self.contains(svgobject): return
         self.removeChild(svgobject)
-        try:
-            del self.objectDict[svgobject.id]
-        except (AttributeError, KeyError):
-            pass
+        deletefromdict(svgobject)
 
-    def deleteAll(self):
+    def deleteAll(self, event=None):
         '''Clear all elements from the canvas'''
         while self.firstChild:
             self.removeChild(self.firstChild)
@@ -815,6 +840,18 @@ class CanvasObject(svg.svg):
                 self.createEditHitTargets()
             except AttributeError:
                 self.createHitTargets()
+
+    @property
+    def lineWidthScaling(self):
+        return self._lineWidthScaling
+
+    @lineWidthScaling.setter
+    def lineWidthScaling(self, lws):
+        currentlws = getattr(self, "_lineWidthScaling", None)
+        if currentlws == lws: return
+        self._lineWidthScaling = lws
+        for objid in self.objectDict:
+            objectDict[objid].style.vectorEffect = "none" if lws else "non-scaling-stroke"
 
     def createHitTargets(self):
         objlist = list(self.objectDict.values())
