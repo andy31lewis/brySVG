@@ -328,6 +328,43 @@ class PolygonMixin(object):
         #print("New pointlist", newpointlist)
         return PolygonObject(newpointlist[:-1]) if currentp == start else False
 
+class PolygonGroup(GroupObject):
+    def __init__(self, objlist=[]):
+        self.boundary = None
+        self.update()
+        super().__init__(objlist)
+
+    def addObject(self, svgobject, objid=None):
+        if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return False
+        if self.objectList == []:
+            self.boundary = PolygonObject(svgobject.pointList)
+        else:
+            newboundary = self.boundary.merge(svgobject)
+            if not newboundary: return newboundary
+            self.boundary = newboundary
+        super().addObject(svgobject, objid)
+        self.update()
+        return True
+
+    def deleteAll(self):
+        self.boundary = None
+        self.update()
+        super().deleteAll()
+
+    def update(self):
+        self.pointList = [] if self.boundary is None else self.boundary.pointList
+        self.segments = [] if self.boundary is None else self.boundary.segments
+
+    def matrixTransform(self, matrix):
+        self.boundary.matrixTransform(matrix)
+        super().matrixTransform(matrix)
+        #print("Pointlist after drag/rotate", self.pointList)
+
+    def cloneObject(self):
+        newobject = super().cloneObject()
+        newobject.boundary = self.boundary.cloneObject()
+        newobject.update()
+        return newobject
 
 class PolygonCanvasMixin(object):
     def doEdgeSnap(self, svgobject):
