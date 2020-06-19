@@ -29,27 +29,39 @@ TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH E
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
 class ObjectMixin(object):
-    '''In MouseMode.DRAG, this just provides the cloneObject method for all svgobjects'''
+    '''Methods applicable to all svgobjects defined in this module.  The main one is the cloneObject method.'''
 
     def cloneObject(self):
         '''Returns a clone of an object, including the extra functionality provided by this module.
         If that functionality is not needed, it is better to call the DOM method cloneNode(object) on the CanvasObject,
         as that is much faster'''
-        for objecttype in shapetypes.values():
-            if isinstance(self, objecttype):
-                newobject = objecttype()
-                break
+        if isinstance(self, GroupObject):
+            newobject = self.__class__()
+            for obj in self.objectList:
+                if isinstance(obj, ObjectMixin):
+                    newobj = obj.cloneObject()
+                    newobject <= newobj
+                    newobj.group = newobject
+                    newobject.objectList.append(newobj)
+        elif isinstance(self, ObjectMixin):
+            newobject = self.__class__()
         else:
             return None
-        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "canvas"]:
+        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "segments"]:
             attr = getattr(self, attrname, None)
-            if not attr: continue
-            newattr = attr[:] if isinstance(attr, list) else attr
+            if attr is None: continue
+            newattr = list(attr) if isinstance(attr, list) else attr
             setattr(newobject, attrname, newattr)
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
         newobject.id = ""
         return newobject
+
+    def setStyle(self, attribute, value):
+        self.style = {attribute:value}
+
+    def __repr__(self):
+        return f"{self.__class__}{self.id}"
 
     def updatehittarget(self):
         hittarget = getattr(self, "hitTarget", None)
@@ -202,6 +214,10 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
+        try:
+            self.extraupdate()
+        except AttributeError:
+            pass
 
 class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
@@ -434,18 +450,20 @@ class RegularPolygon(PolygonObject):
     EITHER centre: the centre of the polygon, OR startpoint: the coordinates of a vertex at the top of the polygon
     EITHER radius: the radius of the polygon, OR sidelength: the length of each side
     offsetangle: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.'''
-    def __init__(self, sidecount, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
-        angle = 2*pi/sidecount
-        radoffset = offsetangle*pi/180
-        if not radius: radius = sidelength/(2*sin(pi/sidecount))
-        if not centre:
-            (x, y) = startpoint
-            centre = (x-radius*sin(radoffset), y+radius*cos(radoffset))
-        (cx, cy) = centre
+    def __init__(self, sidecount=0, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
         self.pointList = []
-        for i in range(sidecount):
-            t = radoffset+i*angle
-            self.pointList.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
+        if sidecount>0:
+            angle = 2*pi/sidecount
+            radoffset = offsetangle*pi/180
+            if not radius: radius = sidelength/(2*sin(pi/sidecount))
+            if not centre:
+                (x, y) = startpoint
+                centre = (x-radius*sin(radoffset), y+radius*cos(radoffset))
+            (cx, cy) = centre
+            self.pointList = []
+            for i in range(sidecount):
+                t = radoffset+i*angle
+                self.pointList.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
         PolygonObject.__init__(self, self.pointList, linecolour, linewidth, fillcolour)
 
 class GroupObject(svg.g, ObjectMixin):
@@ -456,32 +474,44 @@ class GroupObject(svg.g, ObjectMixin):
         svg.g.__init__(self)
         if not isinstance(objlist, list): objlist = [objlist]
         self.objectList = []
+        self._canvas = None
         for obj in objlist:
             self.addObject(obj)
-        self._canvas = None
 
     def addObject(self, svgobject, objid=None):
-        self <= svgobject
+        canvas = self.canvas
+        if canvas is not None: canvas.addObject(svgobject, objid)
         if objid: svgobject.attrs["id"] = objid
+        self <= svgobject
         svgobject.group = self
         self.objectList.append(svgobject)
 
     def addObjects(self, objectlist):
         for obj in objectlist: self.addObject(obj)
 
+    def update(self):
+        pass
+
+    def removeObject(self, svgobject):
+        '''Remove an object from the group'''
+        if not self.contains(svgobject): return
+        self.removeChild(svgobject)
+        self.objectList.remove(svgobject)
+        svgobject.group = None
+        try: #If the group is on the canvas, the object needs removing from the canvas's objectDict
+            del self.canvas.objectDict[svgobject.id]
+        except (AttributeError, KeyError):
+            pass
+
     def deleteAll(self):
-        while self.firstChild:
-            self.removeChild(self.firstChild)
+        if self.canvas:
+            for obj in self.objectList: del self.canvas.objectDict[obj.id]
+        while self.firstChild: self.removeChild(self.firstChild)
         self.objectList = []
 
-    def cloneObject(self):
-        '''Clones the group.'''
-        newobject = GroupObject()
+    def setStyle(self, attribute, value):
         for obj in self.objectList:
-            if isinstance(obj, ObjectMixin):
-                newobj = obj.cloneObject()
-                newobject.addObject(newobj)
-        return newobject
+            obj.setStyle(attribute, value)
 
     @property
     def canvas(self):
@@ -752,6 +782,9 @@ class CanvasObject(svg.svg):
         if isinstance(svgobject, GroupObject):
             for obj in svgobject.objectList:
                 self.translateObject(obj, offset)
+            if hasattr(svgobject, "pointList"):
+                self.translateObject(svgobject.boundary, offset)
+                svgobject.update()
         elif isinstance(svgobject, PointObject):
             svgobject.XY += offset
         else:
@@ -783,6 +816,7 @@ class CanvasObject(svg.svg):
     def createHitTargets(self):
         objlist = list(self.objectDict.values())
         for obj in objlist:
+            if isinstance(obj, GroupObject): continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
             if obj.style.fill != "none" or obj.fixed: continue
@@ -910,11 +944,13 @@ class CanvasObject(svg.svg):
             if objid == svgobject.id: continue
             obj = self.objectDict[objid]
             if not hasattr(obj, "pointList"): continue
+            if objgroup := getattr(obj, "group", None) and hasattr(objgroup, "pointList") : continue
             bbox = obj.getBBox()
             L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
             if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
             checkpoints.extend(obj.pointList)
         checkpoints.sort(key=lambda p:p.coords)
+
         checkstart = 0
         for i, point1 in enumerate(objpoints):
             checkpoints = checkpoints[checkstart:]
@@ -943,6 +979,9 @@ class Point(object):
 
     def __eq__(self, other):
         return (self.coords == other.coords)
+
+    def __lt__(self, other):
+        return self.coords < other.coords
 
     def __add__(self, other):
         if isinstance(other, Point):
@@ -999,9 +1038,6 @@ class Point(object):
 
     def __len__(self):
         return len(self.coords)
-
-    def __lt__(self, other):
-        return self.coords < other.coords
 
     def length(self):
         (x, y) = self.coords

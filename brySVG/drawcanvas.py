@@ -341,6 +341,7 @@ class Handle(PointObject):
 
     def select(self, event):
         if event.type == "mousedown" and event.button > 0: return
+        event.preventDefault()
         event.stopPropagation()
         if self.canvas.tool == "deletepoint":
             self.canvas.deletePoint(self.index)
