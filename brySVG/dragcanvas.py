@@ -661,6 +661,9 @@ class CanvasObject(svg.svg):
         self.selectedhandle = None
         self.transformorigin = None
         self.transformBBox = RectangleObject(linecolour="blue", fillcolour="none")
+        self.transformBBox.style.vectorEffect = "non-scaling-stroke"
+        self.rotateLine = LineObject(linecolour="blue")
+        self.rotateLine.style.vectorEffect = "non-scaling-stroke"
 
         self.bind("mousedown", self.onMouseDown)
         self.bind("mousemove", self.onMouseMove)

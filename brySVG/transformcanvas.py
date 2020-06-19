@@ -55,7 +55,6 @@ class TransformMixin(object):
         if isinstance(self, GroupObject):
             for obj in self.objectList:
                 obj.matrixTransform(matrix)
-            return
         elif isinstance(self, PointObject):
             self.XY = self.transformedpoint(matrix)
         else:
@@ -158,13 +157,14 @@ class TransformCanvasMixin(object):
             if TransformType.TRANSLATE in self.transformTypes: self.transformHandles[TransformType.TRANSLATE].select(event)
         else:
             self.hideTransformHandles()
+            self.rotateLine.style.visibility = "hidden"
 
     def endTransform(self, event):
         if not isinstance(self.mouseOwner, TransformHandle): return
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
         if offset.coords != [0, 0]:
-            centre = (cx, cy) = self.selectedObject.Centre
+            centre = (cx, cy) = self.selectedObject.centre
             vec1 = (x1, y1) = self.StartPoint - centre
             vec2 = (x2, y2) = currentcoords - centre
             transformtype = self.mouseOwner.transformType
@@ -185,46 +185,60 @@ class TransformCanvasMixin(object):
             elif self.vertexSnap: self.doVertexSnap(self.selectedObject)
 
         if self.transformorigin:
-            self.deleteObject(self.transformorigin)
+            self.removeChild(self.transformorigin)
             self.transformorigin = None
         self.showTransformHandles(self.selectedObject)
         self.mouseOwner = None
 
     def showTransformHandles(self, svgobj):
-        tempgroup = GroupObject([svgobj.cloneNode(True)]) #Needed to overcome bug in browser getBBox implementations
+        tempgroup = svg.g() #Needed to overcome bug in browser getBBox implementations
+        tempgroup <= svgobj.cloneNode(True)
         self <= tempgroup
         bbox = tempgroup.getBBox()
         x1, y1, x2, y2 = bbox.x, bbox.y, bbox.x+bbox.width, bbox.y+bbox.height
-        self.deleteObject(tempgroup)
-        svgobj.Centre = Point(((x1+x2)/2, (y1+y2)/2))
+        self.removeChild(tempgroup)
+        svgobj.centre = Point(((x1+x2)/2, (y1+y2)/2))
 
-        self.transformBBox.pointList = [Point((x1,y1)),Point((x2,y2))]
-        self.transformBBox.update()
-        self <= self.transformBBox
-        self.transformBBox.style.visibility = "visible"
         if not self.transformHandles: self.transformHandles = [self.transformBBox] + [TransformHandle(None, i, (0,0), self) for i in range(1,6)]
         for i, coords in enumerate([((x1+x2)/2,(y1+y2)/2), (x1,y1), (x2,(y1+y2)/2), ((x1+x2)/2,y2), (x2,y2)]):
             self.transformHandles[i+1].XY = coords
             self.transformHandles[i+1].owner = svgobj
+        self.usebox = False
+        for ttype in self.transformTypes:
+            if ttype in [TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]: self.usebox = True
+
+        if self.usebox:
+            self.transformBBox.pointList = [Point((x1,y1)),Point((x2,y2))]
+            self.transformBBox.update()
+            self <= self.transformBBox
+            self.transformBBox.style.visibility = "visible"
+        else:
+            handleposition = Point(((x1+x2)/2, y1-100*self.scaleFactor))
+            self.transformHandles[2].XY = handleposition
+            self.rotateLine.pointList = [svgobj.centre, handleposition]
+            self.rotateLine.update()
+            self <= self.rotateLine
+            self.rotateLine.style.visibility = "visible"
         for ttype in self.transformTypes:
             thandle = self.transformHandles[ttype]
             self <= thandle
             if ttype != TransformType.TRANSLATE: thandle.style.visibility = "visible"
+
         return [(x1,y1), (x2,y2)]
 
     def hideTransformHandles(self):
         for obj in self.transformHandles: obj.style.visibility = "hidden"
 
-    def showTransformOrigin(self, transformtype):
-        [(x1,y1), (x2,y2)] = self.transformBBox.pointList
-        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+    def showTransformOrigin(self, svgobj, transformtype):
+        (cx, cy) = svgobj.centre
         if transformtype in [TransformType.NONE, TransformType.TRANSLATE]: return
         if transformtype in [TransformType.ROTATE, TransformType.ENLARGE]:
-            self.transformorigin = PointObject((cx, cy), colour="blue", pointsize=3,canvas=self)
+            self.transformorigin = PointObject((cx, cy), colour="blue", pointsize=4,canvas=self)
         elif transformtype == TransformType.XSTRETCH:
             self.transformorigin = LineObject([(cx,y1), (cx,y2)], linecolour="blue", linewidth=2)
         elif transformtype == TransformType.YSTRETCH:
             self.transformorigin = LineObject([(x1, cy), (x2, cy)], linecolour="blue", linewidth=2)
+        self.transformorigin.style.vectorEffect = "non-scaling-stroke"
         self <= self.transformorigin
 
     def movePoint(self, event):
@@ -233,22 +247,24 @@ class TransformCanvasMixin(object):
         dx, dy = x-self.currentx, y-self.currenty
         if "touch" in event.type and abs(dx) < 5 and abs(dy) < 5: return
         self.currentx, self.currenty = x, y
+        coords = self.getSVGcoords(event)
         if self.mouseMode == MouseMode.DRAW:
-            coords = self.getSVGcoords(event)
             self.mouseOwner.movePoint(coords)
         else:
             if self.mouseMode == MouseMode.TRANSFORM: dx, dy = x-self.startx, y-self.starty
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
             self.mouseOwner.movePoint((dx, dy))
+        return coords
 
 class TransformHandle(PointObject):
     def __init__(self, owner, transformtype, coords, canvas):
         pointsize = 7 if canvas.mouseDetected else 15
-        opacity = 1 if canvas.mouseDetected else 0.2
-        strokewidth = 1 if canvas.mouseDetected else 3
+        opacity = 0.4
+        strokewidth = 3
         PointObject.__init__(self, coords, "red", pointsize, canvas)
         self.style.fillOpacity = opacity
         self.style.strokeWidth = strokewidth
+        self.style.vectorEffect = "non-scaling-stroke"
         self.owner = owner
         self.canvas = canvas
         self.transformType = transformtype
@@ -262,8 +278,9 @@ class TransformHandle(PointObject):
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         self.canvas.hideTransformHandles()
+        if self.transformType != TransformType.ROTATE: self.canvas.rotateLine.style.visibility = "hidden"
         if self.transformType != TransformType.TRANSLATE: self.style.visibility = "visible"
-        self.canvas.showTransformOrigin(self.transformType)
+        self.canvas.showTransformOrigin(self.owner, self.transformType)
 
     def movePoint(self, offset):
         (dx, dy) = offset
@@ -278,7 +295,7 @@ class TransformHandle(PointObject):
                 self.owner.attrs["transform"] = transformstring
             return
 
-        (cx, cy) = self.owner.Centre
+        (cx, cy) = self.owner.centre
         (x1, y1) = self.startx - cx, self.starty - cy
         (x2, y2) = x -cx, y - cy
 
@@ -286,6 +303,9 @@ class TransformHandle(PointObject):
             (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
             angle = atan2(y3, x3)*180/pi
             transformstring = "rotate({},{},{})".format(angle,cx,cy)
+            if not self.canvas.usebox:
+                self.canvas.rotateLine.pointList = [self.owner.centre, self.XY]
+                self.canvas.rotateLine.update()
         elif self.transformType == TransformType.XSTRETCH:
             xfactor = x2/x1
             yfactor = xfactor if isinstance(self.owner, CircleObject) else 1
