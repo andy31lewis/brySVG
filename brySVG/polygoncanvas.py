@@ -21,6 +21,7 @@ class Enum(list):
             self.append(i)
 
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT TOUCHING')
+dp = 2
 
 class ListDict(dict):
     def __getitem__(self, key):
@@ -56,9 +57,6 @@ class Segment(object):
         self.gradient = inf if self.dx == 0 else self.dy/self.dx
         self.angle = atan2(self.dy, self.dx)-pi/2+pi*(self.dy<0)
 
-    def __repr__(self):
-        return f"{self.poly.ID}{self.index}: [{self.leftpoint}, {self.rightpoint}]; currenty: {self.y}, xpos: {self.xpos}"
-
 class Intersection(object):
     def __init__(self, poly1, index1, poly2, index2, point=None):
         self.poly1 = poly1
@@ -67,29 +65,10 @@ class Intersection(object):
         self.index2 = index2
         if point: self.point = point
 
-    def __repr__(self):
-        if isinstance(self.index1, int):
-            s1 = f"at vertex {self.index1}"
-        else:
-            i1, i2 = self.index1
-            s1 = f"between vertices {i1} and {i2}"
-        if isinstance(self.index2, int):
-            s2 = f"at vertex {self.index2}"
-        else:
-            i1, i2 = self.index2
-            s2 = f"between vertices {i1} and {i2}"
-        if self.poly1.ID == "B":
-            return f"{round(self.point,1)} \n{s2} on polygon {self.poly2.ID}\n{s1} on polygon {self.poly1.ID}"
-        else:
-            return f"{round(self.point,1)} \n{s1} on polygon {self.poly1.ID}\n{s2} on polygon {self.poly2.ID}"
-
-class PolygonObject(PolygonObject):
-    def update(self):
-        tt = time.time()
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
+class PolygonMixin(object):
+    def extraupdate(self):
         L = len(self.pointList)
         self.segments = [Segment(self.pointList[i-1], self.pointList[i], self, ((i-1)%L, i)) for i in range(L)]
-        #print("Update polygon", time.time()-tt)
 
     def containspoint(self, point, dp=1):
         '''Returns "interior" if point is inside the polygon, "edge" if it is on an edge,
@@ -124,15 +103,15 @@ class PolygonObject(PolygonObject):
         '''Returns True if poly1 is identical to poly2, False otherwise.'''
         return _equalpolygons(self.pointList, other.pointList)
 
-    def positionRelativeTo(self, other, sf=5):
+    def positionRelativeTo(self, other):
         '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
         other is another PolygonObject.'''
         def sweeppast(x, latestoutcome, livesegments):
             for seg in livesegments:
                 if seg.rightx == x:
-                    seg.y = roundsf(seg.righty, sf2)
+                    seg.y = round(seg.righty, dp2)
                 else:
-                    seg.y = roundsf(seg.lefty + (x-seg.leftx)*seg.gradient, sf2)
+                    seg.y = round(seg.lefty + (x-seg.leftx)*seg.gradient, dp2)
 
             for i, seg in enumerate(livesegments):
                 for seg2 in livesegments[i+1:]:
@@ -142,7 +121,7 @@ class PolygonObject(PolygonObject):
 
             while unusedsegments and unusedsegments[0].leftx == x:
                 newseg = unusedsegments.pop(0)
-                newseg.y = roundsf(newseg.lefty, sf2)
+                newseg.y = round(newseg.lefty, dp2)
                 livesegments.append(newseg)
             livesegments.sort(key=lambda seg: (seg.y, seg.gradient))
 
@@ -165,11 +144,11 @@ class PolygonObject(PolygonObject):
                     latestoutcome = Position.DISJOINT
             return latestoutcome, livesegments
 
-        coordslist1, coordslist2 = _getrotatedcoords(self, other, xsf=sf)
+        coordslist1, coordslist2 = _getrotatedcoords(self, other, xdp=dp)
 
         transposed = False
         polyA, polyB = self, other
-        bboxresult = _compareboundingboxes(coordslist1, coordslist2, ysf=sf)
+        bboxresult = _compareboundingboxes(coordslist1, coordslist2, ydp=dp)
         if bboxresult in {Position.DISJOINT, Position.TOUCHING}: return Position.DISJOINT
         if bboxresult == Position.EQUAL:
             if _equalpolygons(coordslist1, coordslist2): return Position.EQUAL
@@ -185,7 +164,7 @@ class PolygonObject(PolygonObject):
         unusedsegments = _getsortedsegments(polyA, coordslist1, polyB, coordslist2)
         livesegments = []
         currentoutcome = None
-        sf2 = sf-2
+        dp2 = dp-2
         xvalues = sorted(set(x for (x, y) in coordslist1+coordslist2))
         for x in xvalues: #Vertical sweepline stops at each vertex of either polygon
             currentoutcome, livesegments = sweeppast(x, currentoutcome, livesegments)
@@ -193,7 +172,7 @@ class PolygonObject(PolygonObject):
         if currentoutcome == Position.CONTAINS and transposed: currentoutcome = Position.INSIDE
         return currentoutcome
 
-    def getIntersections(self, other, sf=5):
+    def getIntersections(self, other):
         '''Returns a list of Intersection objects. Each Intersection has 3 attributes:
         .point: a Point whose coordinates are the intersection
         .selfindex: if this is an integer i, the intersection is at a vertex of self, namely self.pointList[i]
@@ -211,27 +190,30 @@ class PolygonObject(PolygonObject):
         def sweeppast(x, livesegments):
             for seg in livesegments:
                 if seg.rightx == x:
-                    seg.y = roundsf(seg.righty, sf2)
+                    seg.y = round(seg.righty, dp2)
                     seg.xpos = "R"
                     seg.currentindex = seg.rightindex
                 else:
-                    seg.y = roundsf(seg.lefty + (x-seg.leftx)*seg.gradient, sf2)
+                    seg.y = round(seg.lefty + (x-seg.leftx)*seg.gradient, dp2)
                     seg.xpos = "M"
                     seg.currentindex = seg.index
 
             for i, seg in enumerate(livesegments):
                 for seg2 in livesegments[i+1:]:
+                    if seg.y == inf or seg2.y == inf: continue
                     if seg.y > seg2.y and seg.poly != seg2.poly:
                         intersections.append(Intersection(seg.poly, seg.index, seg2.poly, seg2.index))
 
+            newsegments = []
             while unusedsegments and unusedsegments[0].leftx == x:
                 newseg = unusedsegments.pop(0)
-                newseg.y = roundsf(newseg.lefty, sf2)
+                newseg.y = round(newseg.lefty, dp2)
                 newseg.xpos = "L"
                 newseg.currentindex = newseg.leftindex
-                livesegments.append(newseg)
-            livesegments.sort(key=lambda seg: (seg.y, seg.gradient))
+                newsegments.append(newseg)
 
+            livesegments.sort(key=lambda seg: seg.y)
+            livesegments = mergelists(livesegments, newsegments)
             segiter = iter(livesegments)
             seg = next(segiter, None)
             while seg is not None:
@@ -240,17 +222,17 @@ class PolygonObject(PolygonObject):
                 if seg is None: break
                 if (x, seg.y) in usedpoints: continue
                 if seg.y == prevseg.y and seg.poly != prevseg.poly:
-                    if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"} or roundsf(seg.gradient, sf2) != roundsf(prevseg.gradient, sf2):
+                    if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"}:
                         intersections.append(Intersection(seg.poly, seg.currentindex, prevseg.poly, prevseg.currentindex))
                         usedpoints.add((x, seg.y))
                         while seg and seg.y == prevseg.y:
                             seg = next(segiter, None)
 
-            livesegments = [seg for seg in livesegments if roundsf(seg.rightx, sf) > x]
+            livesegments = [seg for seg in livesegments if seg.xpos != "R"]
             return livesegments
 
-        coordslist1, coordslist2 = _getrotatedcoords(self, other, xsf=sf)
-        bboxresult = _compareboundingboxes(coordslist1, coordslist2, ysf=sf)
+        coordslist1, coordslist2 = _getrotatedcoords(self, other, xdp=dp)
+        bboxresult = _compareboundingboxes(coordslist1, coordslist2, ydp=dp)
         if bboxresult == Position.DISJOINT: return []
         if bboxresult == Position.EQUAL and _equalpolygons(coordslist1, coordslist2):
             return [Intersection(self, i, other, i, point) for (i, point) in enumerate(self.pointList)]
@@ -259,7 +241,7 @@ class PolygonObject(PolygonObject):
         usedpoints = set()
         unusedsegments = _getsortedsegments(self, coordslist1, other, coordslist2)
         livesegments = []
-        sf2 = sf-2
+        dp2 = dp-2
         xvalues = sorted(set(x for (x, y) in coordslist1+coordslist2))
         for x in xvalues: #Vertical sweepline stops at each vertex of either polygon
             livesegments = sweeppast(x, livesegments)
@@ -279,10 +261,9 @@ class PolygonObject(PolygonObject):
 
         return intersections
 
-    def merge(self, other, sf=5):
+    def merge(self, other, sf=2):
 
         #print("self pointlist", self.pointList)
-        #print("svgobject pointlist", svgobject.pointList)
         ixlist = self.getIntersections(other)
         if ixlist == []: return None
         ixlist.sort(key = lambda ix:ix.point)
@@ -317,18 +298,19 @@ class PolygonObject(PolygonObject):
             for i in range(last+1): vertexdict[reflists[j][i]].update({reflists[j][i-1], reflists[j][(i+1) if i<last else 0]})
         #print("vertexdict")
         #for point in vertexdict:
-        #    print(point, vertexdict[point])
+            #print(point, vertexdict[point])
 
         minp = Point((inf, inf))
         for (j, i) in vertexdict:
             p = pointlists[j][i]
             if p < minp: minp, minref = p, (j, i)
-        currentref = start = minref
-        currentp = minp
+        currentref = minref
+        currentp = start = minp
         newpointlist = [currentp]
         v1 = Point((0,1))
+        usedrefs ={(start, v1)}
+        #print("currentref, v1", currentref, v1)
         while True:
-            #print("currentref", currentref)
             maxangle = -pi
             for (j, i) in vertexdict[currentref]:
                 p = pointlists[j][i]
@@ -336,17 +318,16 @@ class PolygonObject(PolygonObject):
                 angle = v2.anglefrom(v1)
                 #print("startvec", v1,"point",p, "pvec", v2, "angle", angle*180/pi)
                 if angle > maxangle: (maxangle, bestp, bestref) = (angle, p, (j, i))
-            if bestref == start: break
+            if [currentp, bestp] == newpointlist[:2]: break
             currentref = bestref
             newpointlist.append(bestp)
             v1 = bestp - currentp
             currentp = bestp
-            if currentref == start: break
+            if (currentref, v1) in usedrefs: break
+            usedrefs.add((currentref, v1))
+        #print("New pointlist", newpointlist)
+        return PolygonObject(newpointlist[:-1]) if currentp == start else False
 
-        return PolygonObject(newpointlist)
-
-class RegularPolygon(PolygonObject, RegularPolygon):
-    pass
 
 class PolygonCanvasMixin(object):
     def doEdgeSnap(self, svgobject):
@@ -371,7 +352,8 @@ class PolygonCanvasMixin(object):
         for objid in self.objectDict:
             if objid == svgobject.id: continue
             obj = self.objectDict[objid]
-            if not hasattr(obj, "pointList"): continue
+            if getattr(obj, "group", None): continue
+            if not isinstance(obj, (PolygonObject, PolygonGroup)): continue
             bbox = obj.getBBox()
             L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
             if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
@@ -380,9 +362,6 @@ class PolygonCanvasMixin(object):
         checkstart = 0
         piby4 = pi/4
         found = False
-        #print("snapangle", snapangle)
-        #print("object angles", [seg.angle for seg  in objsegs])
-        #print("check angles", [seg.angle for seg  in checksegs])
         for i, seg1 in enumerate(objsegs):
             angle1 = seg1.angle
             #print("\nChecking:", angle1)
@@ -483,17 +462,13 @@ class PolygonCanvasMixin(object):
                 if angled > snapangle:
                     #print("Finished checking", angle1)
                     break
+
         if bestangle is not None:
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
             svgobject.rotateandtranslate(angle*180/pi, centre, vector)
-            #svgobject.rotate(angle*180/pi, centre)
-            #svgobject.translate(vector)
-            #self.addObject(PointObject(centre), objid="centre")
             if not self.vertexSnap: return
             objpoints = [svgobject.pointList[objseg.leftindex], svgobject.pointList[objseg.rightindex]]
             checkpoints = [checkseg.leftpoint, checkseg.rightpoint]
-            #for point1 in objpoints: self <= PointObject(point1)
-            #for point2 in checkpoints: self <= PointObject(point2)
             pointpairs = [(p1, p2) for p1 in objpoints for p2 in checkpoints]
             for (point1, point2) in pointpairs:
                 (dx, dy) = point2 - point1
@@ -506,17 +481,17 @@ class PolygonCanvasMixin(object):
         print("rotatesnap", time.time()-tt)
         #self.doSnap(svgobject)
 
-def _compareboundingboxes(poly1, poly2, xsf=None, ysf=None):
+def _compareboundingboxes(poly1, poly2, xdp=None, ydp=None):
     def getboundingbox(poly):
-        xcoords = [roundsf(x, xsf) for (x,y) in poly] if xsf else [x for (x,y) in poly]
+        xcoords = [round(x, xdp) for (x,y) in poly] if xdp else [x for (x,y) in poly]
         left = min(xcoords)
         right = max(xcoords)
-        ycoords = [roundsf(y, ysf) for (x,y) in poly] if ysf else [y for (x,y) in poly]
+        ycoords = [round(y, ydp) for (x,y) in poly] if ydp else [y for (x,y) in poly]
         top = min(ycoords)
         bottom = max(ycoords)
         return (left, top), (right, bottom)
 
-    if xsf: ysf = xsf
+    if xdp: ydp = xdp
     ((left1, top1), (right1, bottom1)) = getboundingbox(poly1)
     ((left2, top2), (right2, bottom2)) = getboundingbox(poly2)
     if right1 < left2 or right2 < left1 or bottom1 < top2 or bottom2 < top1: return Position.DISJOINT
@@ -559,26 +534,26 @@ def _equalpolygons(poly1, poly2):
     poly2 =  poly2[start2+1:]+poly2[:start2]
     return poly1 == poly2 or poly1 == poly2[::-1]
 
-def _getrotatedcoords(self, other, xsf):
+def _getrotatedcoords(self, other, xdp):
     def getbestangle(poly1, poly2):
-        vecs = [poly1.pointList[i] - poly1.pointList[i-1] for i in range(len(poly1.pointList))]
-        poly1.anglesfromvertical = [roundsf(abs(abs(atan2(vec[1], vec[0])) - pi/2), xsf) for vec in vecs]
-        vecs = [poly2.pointList[i] - poly2.pointList[i-1] for i in range(len(poly2.pointList))]
-        poly2.anglesfromvertical = [roundsf(abs(abs(atan2(vec[1], vec[0])) - pi/2), xsf) for vec in vecs]
-        fromvertical = poly1.anglesfromvertical + poly2.anglesfromvertical
-        #print("From Vertical Poly1", poly1.anglesfromvertical, "\nPoly2", poly2.anglesfromvertical)
+        fromvertical = [abs(seg.angle) for seg in poly1.segments + poly2.segments]
         if 0 not in fromvertical: return 0
         positiveangles = [a for a in fromvertical if a>0.1]
         return min(positiveangles)/2
 
     a = getbestangle(self, other)
+    dp1 = xdp+1
+    #print(f"Before rotation:\nPoly1: {self.pointList}\nPoly2: {other.pointList}")
+    poly1 = [(round(x, dp1), round(y, dp1)) for (x, y) in self.pointList]
+    poly2 = [(round(x, dp1), round(y, dp1)) for (x, y) in other.pointList]
+    #print(f"After rounding before rotation:\nPoly1: {poly1}\nPoly2: {poly2}")
     cosa, sina = cos(a), sin(a)
     poly1rotated = self.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in self.pointList]
     poly2rotated = other.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in other.pointList]
 
-    coords1 = [(roundsf(x, xsf), y) for (x, y) in poly1rotated]
-    coords2 = [(roundsf(x, xsf), y) for (x, y) in poly2rotated]
-    #print(f"Poly1: {poly1}\nPoly2: {poly2}")
+    coords1 = [(round(x, xdp), y) for (x, y) in poly1rotated]
+    coords2 = [(round(x, xdp), y) for (x, y) in poly2rotated]
+    #print(f"After rotation:\nPoly1: {coords1}\nPoly2: {coords2}")
     return coords1, coords2
 
 def _getsortedsegments(poly1, coordslist1, poly2, coordslist2):
@@ -586,7 +561,30 @@ def _getsortedsegments(poly1, coordslist1, poly2, coordslist2):
     seglist1 = [Segment(coordslist1[i-1], coordslist1[i], poly1, ((i-1)%L1, i)) for i in range(L1)]
     seglist2 = [Segment(coordslist2[i-1], coordslist2[i], poly2, ((i-1)%L2, i)) for i in range(L2)]
     segments = seglist1 + seglist2
-    segments.sort(key = lambda seg: seg.leftx)
+    segments.sort(key = lambda seg: (seg.leftx, round(seg.lefty, dp), seg.gradient))
     return segments
 
+def mergelists(list1,list2):
+    if not list1:  return list(list2)
+    if not list2:  return list(list1)
+
+    list1iter, list2iter = iter(list1), iter(list2)
+    item1 = next(list1iter)
+    item2 = next(list2iter)
+    result = []
+
+    while item1:
+        while item2 and (item2.y < item1.y or (item2.y == item1.y and item1.xpos != "R" and item2.gradient < item1.gradient)):
+            result.append(item2)
+            item2 = next(list2iter, None)
+        result.append(item1)
+        item1 = next(list1iter, None)
+    if item2:
+        result.append(item2)
+        result.extend(list2iter)
+    return result
+
+PolygonObject.__bases__ = PolygonObject.__bases__ + (PolygonMixin,)
 CanvasObject.__bases__ = CanvasObject.__bases__ + (PolygonCanvasMixin,)
+class RegularPolygon(RegularPolygon, PolygonObject):
+    pass
