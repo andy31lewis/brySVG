@@ -115,6 +115,7 @@ class PolygonMixin(object):
 
             for i, seg in enumerate(livesegments):
                 for seg2 in livesegments[i+1:]:
+                    if seg.y == inf or seg2.y == inf: continue
                     if seg.y > seg2.y and seg.poly != seg2.poly:
                         return Position.OVERLAPS, None
             livesegments = [seg for seg in livesegments if seg.rightx > x]
@@ -585,8 +586,8 @@ def _getrotatedcoords(self, other, xdp):
     poly2 = [(round(x, dp1), round(y, dp1)) for (x, y) in other.pointList]
     #print(f"After rounding before rotation:\nPoly1: {poly1}\nPoly2: {poly2}")
     cosa, sina = cos(a), sin(a)
-    poly1rotated = self.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in self.pointList]
-    poly2rotated = other.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in other.pointList]
+    poly1rotated = self.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in poly1]
+    poly2rotated = other.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in poly2]
 
     coords1 = [(round(x, xdp), y) for (x, y) in poly1rotated]
     coords2 = [(round(x, xdp), y) for (x, y) in poly2rotated]
