@@ -196,9 +196,10 @@ class TransformCanvasMixin(object):
         tempgroup <= svgobj.cloneNode(True)
         self <= tempgroup
         bbox = tempgroup.getBBox()
-        x1, y1, x2, y2 = bbox.x, bbox.y, bbox.x+bbox.width, bbox.y+bbox.height
+        (x1, y1), (x2, y2) = svgobj.bbox = (bbox.x, bbox.y), (bbox.x+bbox.width, bbox.y+bbox.height)
         self.removeChild(tempgroup)
-        svgobj.centre = Point(((x1+x2)/2, (y1+y2)/2))
+        (cx, cy) = svgobj.centre = Point(((x1+x2)/2, (y1+y2)/2))
+        ((left, top), (right, bottom)) = self.viewWindow
 
         if not self.transformHandles: self.transformHandles = [self.transformBBox] + [TransformHandle(None, i, (0,0), self) for i in range(1,6)]
         for i, coords in enumerate([((x1+x2)/2,(y1+y2)/2), (x1,y1), (x2,(y1+y2)/2), ((x1+x2)/2,y2), (x2,y2)]):
@@ -214,7 +215,10 @@ class TransformCanvasMixin(object):
             self <= self.transformBBox
             self.transformBBox.style.visibility = "visible"
         else:
-            handleposition = Point(((x1+x2)/2, y1-100*self.scaleFactor))
+            handlelength = min((bottom-top)*0.4, (y2-y1)*2)
+            ypos = cy-handlelength
+            if ypos < top: ypos = cy+handlelength
+            handleposition = Point(((x1+x2)/2, ypos))
             self.transformHandles[2].XY = handleposition
             self.rotateLine.pointList = [svgobj.centre, handleposition]
             self.rotateLine.update()
@@ -232,6 +236,7 @@ class TransformCanvasMixin(object):
 
     def showTransformOrigin(self, svgobj, transformtype):
         (cx, cy) = svgobj.centre
+        (x1, y1), (x2, y2) = svgobj.bbox
         if transformtype in [TransformType.NONE, TransformType.TRANSLATE]: return
         if transformtype in [TransformType.ROTATE, TransformType.ENLARGE]:
             self.transformorigin = PointObject((cx, cy), colour="blue", pointsize=4,canvas=self)

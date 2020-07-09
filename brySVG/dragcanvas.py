@@ -214,10 +214,12 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
-        try:
-            self.extraupdate()
-        except AttributeError:
-            pass
+
+    def __repr__(self):
+        return f"polygon {self.id}" if self.id else f"polygon {id(self)}"
+
+    def __str__(self):
+        return self.__repr__()
 
 class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
@@ -487,7 +489,12 @@ class GroupObject(svg.g, ObjectMixin):
         self.objectList.append(svgobject)
 
     def addObjects(self, objectlist):
-        for obj in objectlist: self.addObject(obj)
+        canvas = self.canvas
+        for obj in objectlist:
+            if canvas is not None: canvas.addObject(obj)
+            self <= obj
+            obj.group = self
+            self.objectList.append(obj)
 
     def update(self):
         pass
@@ -691,7 +698,8 @@ class CanvasObject(svg.svg):
         (pt.x, pt.y) = (bcr.left+bcr.width, bcr.top+bcr.height)
         SVGpt =  pt.matrixTransform(self.getScreenCTM().inverse())
         (x2, y2) = (SVGpt.x, SVGpt.y)
-        return ((x1, y1), (x2, y2))
+        self.viewWindow = [Point((x1, y1)), Point((x2, y2))]
+        return self.viewWindow
 
     def setDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
@@ -753,7 +761,7 @@ class CanvasObject(svg.svg):
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.objectList:
                     deletefromdict(obj)
-            del self.objectDict[svgobj.id]
+            if svgobj.id in self.objectDict: del self.objectDict[svgobj.id]
 
         if not self.contains(svgobject): return
         self.removeChild(svgobject)
@@ -1075,6 +1083,13 @@ class Point(object):
 
     def __getitem__(self, i):
         return self.coords[i]
+
+    def __hash__(self):
+        return hash(tuple(self.coords))
+
+    def __round__(self, n):
+        (x, y) = self.coords
+        return Point((round(float(x), n), round(float(y), n)))
 
     def __len__(self):
         return len(self.coords)
