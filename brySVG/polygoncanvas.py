@@ -61,7 +61,7 @@ class Segment(object):
         self.xpos = "L"
 
     def __repr__(self):
-        return f"{self.poly}{self.index}: [{self.leftpoint}, {self.rightpoint}]; currenty: {self.y}, xpos: {self.xpos}, gradient: {self.gradient}"
+        return f"{self.poly}{self.index}: [{self.leftpoint}, {self.rightpoint}]; currenty: {self.y}, xpos: {self.xpos}, gradient: {self.gradient}, angle: {self.angle}"
 
 class Intersection(object):
     def __init__(self, poly1, index1, poly2, index2, point=None):
@@ -245,12 +245,15 @@ class PolygonCanvasMixin(object):
             objsegments = [Segment(obj.pointList[i-1], obj.pointList[i], obj, ((i-1)%L, i)) for i in range(L)]
             checksegs.extend(objsegments)
         checksegs.sort(key = lambda seg: seg.angle)
+        for seg in checksegs:
+            if seg.angle > snapangle - pi/2: break
+            newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
+            newseg.angle = seg.angle + pi
+            checksegs.append(newseg)
         #print("objsegs")
-        #for seg in objsegs:
-            #print(seg)
+        #for seg in objsegs: print(seg)
         #print("checksegs")
-        #for seg in checksegs:
-            #print(seg)
+        #for seg in checksegs: print(seg)
         checkstart = 0
         piby4 = pi/4
         found = False
