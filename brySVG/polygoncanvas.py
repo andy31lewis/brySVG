@@ -363,7 +363,7 @@ class PolygonCanvasMixin(object):
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
             if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
             if not self.vertexSnap: return
-            transformmemo.clear()
+            #transformmemo.clear()
             objpoints = [svgobject.pointList[objseg.leftindex], svgobject.pointList[objseg.rightindex]]
             checkpoints = [checkseg.leftpoint, checkseg.rightpoint]
             pointpairs = [(p1, p2) for p1 in objpoints for p2 in checkpoints]

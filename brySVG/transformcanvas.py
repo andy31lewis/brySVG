@@ -62,6 +62,7 @@ class TransformMixin(object):
         t = svgbase.createSVGTransform()
         t.setTranslate(*vector)
         self.matrixTransform(t.matrix)
+        transformmemo.clear()
 
     def rotate(self, angle, centre=None):
         '''Rotate object clockwise by angle degrees around centre.
@@ -74,6 +75,7 @@ class TransformMixin(object):
         t = svgbase.createSVGTransform()
         t.setRotate(angle, *centre)
         self.matrixTransform(t.matrix)
+        transformmemo.clear()
 
     def rotateandtranslate(self, angle, centre=None, vector=(0,0)):
         if not centre:
@@ -83,6 +85,7 @@ class TransformMixin(object):
         if angle != 0: t.setRotate(angle, *centre)
         M = t.matrix.translate(*vector) if vector != (0,0) else t.matrix
         self.matrixTransform(M)
+        transformmemo.clear()
 
     def rotateByVectors(self, vec1, vec2, centre=(0, 0)):
         '''Rotate object clockwise by the angle between vec1 and vec2 around centre.
@@ -99,6 +102,7 @@ class TransformMixin(object):
         matrix = matrix.rotateFromVector(x3, y3)
         matrix = matrix.translate(-cx, -cy)
         self.matrixTransform(matrix)
+        transformmemo.clear()
 
     def xstretch(self, xscale, cx=0):
         '''Stretch object in the x-direction by scale factor xscale, with invariant line x = cx.
@@ -112,6 +116,7 @@ class TransformMixin(object):
         matrix.a = xscale
         matrix = matrix.translate(-cx, 0)
         self.matrixTransform(matrix)
+        transformmemo.clear()
         if angle != 0: self.rotate(angle)
 
     def ystretch(self, yscale, cy=0):
@@ -126,6 +131,7 @@ class TransformMixin(object):
         matrix.d = yscale
         matrix = matrix.translate(0, -cy)
         self.matrixTransform(matrix)
+        transformmemo.clear()
         if angle != 0: self.rotate(angle)
 
     def enlarge(self, scalefactor, centre):
@@ -137,6 +143,7 @@ class TransformMixin(object):
         matrix = matrix.scale(scalefactor)
         matrix = matrix.translate(-cx, -cy)
         self.matrixTransform(matrix)
+        transformmemo.clear()
 
 class TransformCanvasMixin(object):
     def prepareTransform(self, event):
@@ -173,7 +180,7 @@ class TransformCanvasMixin(object):
 
             if self.edgeSnap: self.doEdgeSnap(self.selectedObject)
             elif self.vertexSnap: self.doVertexSnap(self.selectedObject)
-            transformmemo.clear()
+            #transformmemo.clear()
 
         if self.transformorigin:
             self.removeChild(self.transformorigin)
