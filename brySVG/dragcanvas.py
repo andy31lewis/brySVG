@@ -14,6 +14,8 @@ from browser import document, alert
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot, floor, log10
 svgbase = svg.svg()
+basepoint = svgbase.createSVGPoint()
+transformmemo = {}
 lasttaptime = 0
 fixeddefault = False
 
@@ -70,14 +72,32 @@ class ObjectMixin(object):
             if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
             hittarget.update()
 
+    """ ***Superseded by version below***
     def transformedpointlist(self, matrix):
         '''Not intended to be called by end users.'''
-        pt = svgbase.createSVGPoint()
         newpointlist = []
         for point in self.pointList:
-            (pt.x, pt.y) = point
-            pt =  pt.matrixTransform(matrix)
-            newpointlist.append(Point((pt.x, pt.y)))
+            (basepoint.x, basepoint.y) = point
+            newpt =  basepoint.matrixTransform(matrix)
+            newpointlist.append(Point((newpt.x, newpt.y)))
+        return newpointlist
+
+    """
+    #Customised for speed when snapping large groups of polygons
+    def transformedpointlist(self, matrix):
+        '''Not intended to be called by end users.'''
+        newpointlist = []
+        for point in self.pointList:
+            h = hash(tuple(point.coords))
+            if h in transformmemo:
+                newpoint = transformmemo[h]
+                #print("Using memo")
+            else:
+                (basepoint.x, basepoint.y) = point
+                newpt =  basepoint.matrixTransform(matrix)
+                transformmemo[h] = newpoint = Point((newpt.x, newpt.y))
+            #print(point, "to", newpoint)
+            newpointlist.append(newpoint)
         return newpointlist
 
 class SmoothBezierMixin(object):

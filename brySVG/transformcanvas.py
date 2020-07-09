@@ -17,17 +17,6 @@ class TransformMixin(object):
     Note that if no mouse interaction is needed with the objects after the transformation, it is better to use the
     translateElement, rotateElement, scaleElement methods provided by the CanvasObject, as they are much faster.'''
 
-    #This is never used as the one in dragcanvas.py gets used instead
-    def transformedpointlist(self, matrix):
-        '''Not intended to be called by end users.'''
-        pt = svgbase.createSVGPoint()
-        newpointlist = []
-        for point in self.pointList:
-            (pt.x, pt.y) = point
-            newpt =  pt.matrixTransform(matrix)
-            newpointlist.append(Point((newpt.x, newpt.y)))
-        return newpointlist
-
     def transformedpoint(self, matrix):
         '''Not intended to be called by end users.'''
         pt = svgbase.createSVGPoint()
@@ -184,6 +173,7 @@ class TransformCanvasMixin(object):
 
             if self.edgeSnap: self.doEdgeSnap(self.selectedObject)
             elif self.vertexSnap: self.doVertexSnap(self.selectedObject)
+            transformmemo.clear()
 
         if self.transformorigin:
             self.removeChild(self.transformorigin)
