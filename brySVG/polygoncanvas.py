@@ -23,6 +23,8 @@ class Enum(list):
 
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT TOUCHING')
 dp = 2
+dp1 = dp-1
+dp2 = dp-2
 
 class ListDict(dict):
     def __getitem__(self, key):
@@ -65,7 +67,7 @@ class Segment(object):
 
 class Intersection(object):
     def __init__(self, poly1, index1, poly2, index2, point=None):
-        self.polyrefs = {(poly1, index1), (poly2, index2)}
+        self.polyrefs = {poly1:index1, poly2:index2}
         self.poly1 = poly1
         self.index1 = index1
         self.poly2 = poly2
@@ -73,9 +75,10 @@ class Intersection(object):
         self.point = point if point is not None else Point((0, 0))
 
     def __repr__(self):
-        s = f"{round(self.point,1)} \n"
-        refs = sorted(self.polyrefs, key = lambda ref: ref[0].id)
-        for (poly, index) in refs:
+        s = f"{self.point} \n"
+        polys = sorted(self.polyrefs, key = lambda poly: poly.id)
+        for poly in polys:
+            index = self.polyrefs[poly]
             if isinstance(index, int):
                 s += f"at vertex {index} on polygon {poly}\n"
             else:
@@ -446,18 +449,18 @@ def _getrotatedcoords(polylist, xdp):
     a = getbestangle(polylist)
     cosa, sina = cos(a), sin(a)
     #print("Best angle", a*180/pi)
-    dp1 = xdp+1
+    xdp1 = xdp+1
     #print(f"Before rotation:\nPoly1: {self.pointList}\nPoly2: {other.pointList}")
     coordslists = []
     for poly in polylist:
-        polyrounded = [(round(x, dp1), round(y, dp1)) for (x, y) in poly.pointList]
-        #print(f"After rounding before rotation:\nPoly1: {poly1}\nPoly2: {poly2}")
+        polyrounded = [(round(x, xdp1), round(y, xdp1)) for (x, y) in poly.pointList]
+        #print(f"\nAfter rounding before rotation:\n{polyrounded}")
         polyrotated = poly.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in polyrounded]
-        #print(f"After rotation:\nPoly1: {poly1rotated}\nPoly2: {poly2rotated}")
+        #print(f"After rotation:\n{polyrotated}")
 
         coords = [(round(x, xdp), y) for (x, y) in polyrotated]
         coordslists.append(coords)
-        #print(f"After rotation and rounding:\nPoly1: {coords1}\nPoly2: {coords2}")
+        #print(f"After rotation and rounding:\n{coords}")
     return coordslists
 
 def _getsortedsegments(polylist, coordslists):
@@ -465,7 +468,7 @@ def _getsortedsegments(polylist, coordslists):
     for poly, coordslist in zip(polylist, coordslists):
         L = len(coordslist)
         segments.extend([Segment(coordslist[i-1], coordslist[i], poly, ((i-1)%L, i)) for i in range(L)])
-    segments.sort(key = lambda seg: (seg.leftx, round(seg.lefty, dp), seg.gradient))
+    segments.sort(key = lambda seg: (seg.leftx, round(seg.lefty, dp1), seg.gradient))
     return segments
 
 def mergelists(list1,list2):
@@ -560,7 +563,6 @@ def relativeposition(self, other):
         #print(seg)
     livesegments = []
     currentoutcome = None
-    dp2 = dp-2
     xvalues = sorted(set(x for (x, y) in coordslist1+coordslist2))
     #print("\nxValues", xvalues)
     for x in xvalues: #Vertical sweepline stops at each vertex of either polygon
@@ -571,8 +573,6 @@ def relativeposition(self, other):
     #print("sweeping", time.time()-tt)
     if currentoutcome == Position.CONTAINS and transposed: currentoutcome = Position.INSIDE
     return currentoutcome
-
-
 
 def findintersections(polylist):
     '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
@@ -656,7 +656,6 @@ def findintersections(polylist):
     #print("\nSegments at start:")
     #for seg in unusedsegments: print(seg)
     livesegments = []
-    dp2 = dp-2
     xvalues = sorted(set(x for coordslist in coordslists for (x, y) in coordslist))
     #print("\nxValues", xvalues)
     for x in xvalues: #Vertical sweepline stops at each vertex of either polygon
@@ -671,11 +670,21 @@ def findintersections(polylist):
         else:
             ix.point = calculatepoint(ix)
         #print(ix)
-        if ix.point in ixpoints:
-            #print("combining with", ixpoints[ix.point])
-            ixpoints[ix.point].polyrefs.update(ix.polyrefs)
+        ixkey = round(ix.point, dp2)
+        if ixkey in ixpoints:
+            #print("combining with", ixpoints[ixkey])
+            #ixpoints[ixkey].polyrefs.update(ix.polyrefs)
+            for poly in ix.polyrefs:
+                index = ix.polyrefs[poly]
+                if (poly not in ixpoints[ixkey].polyrefs) or isinstance(index, int):
+                    ixpoints[ixkey].polyrefs[poly] = ix.polyrefs[poly]
+                else:
+                    oldindex = ixpoints[ixkey].polyrefs[poly]
+                    if isinstance(oldindex, tuple) and index != oldindex:
+                        (a,b), (c,d) = index, oldindex
+                        ixpoints[ixkey].polyrefs[poly] = b if b==c else a
         else:
-            ixpoints[ix.point] = ix
+            ixpoints[ixkey] = ix
         #print("ixpoints so far:", ixpoints)
         if ix.poly1 == polylist[0]:
             ix.selfindex, ix.otherindex = ix.index1, ix.index2
@@ -713,7 +722,7 @@ def boundary(polylist):
     regions = []
     for i, ix in enumerate(ixlist):
         #print("intersection", i, "at", ix.point, "has polyrefs", ix.polyrefs)
-        for (poly, index) in ix.polyrefs:
+        for (poly, index) in ix.polyrefs.items():
             #print(poly, "has listindex", poly.listindex)
             j = poly.listindex
             if isinstance(index, tuple):
@@ -722,7 +731,7 @@ def boundary(polylist):
             else:
                 #print("Replacing point", index, "in poly", poly)
                 reflists[j][index] = (L, i)
-        polyset = {poly for (poly, index) in ix.polyrefs}
+        polyset = set(ix.polyrefs)
         for region in regions:
             if polyset & region:
                 region.update(polyset)
@@ -774,7 +783,7 @@ def boundary(polylist):
     v1 = Point((0,1))
     usedrefs ={(minref, v1)}
     (j, i) = minref
-    startpoly = next(iter(ixlist[i].polyrefs))[0] if j == L else polylist[j]
+    startpoly = next(iter(ixlist[i].polyrefs)) if j == L else polylist[j]
     for region in polyregions:
         if startpoly in region:
             boundaryregion = region
@@ -784,13 +793,12 @@ def boundary(polylist):
 
     #print("currentref, currentp, v1", currentref, currentp, v1)
     while True:
-        #print("Polys used so far", usedpolys)
         maxangle = -pi
         for (j, i) in vertexdict[currentref]:
             p = pointlists[j][i]
             v2 = p-currentp
             angle = v2.anglefrom(v1)
-            #print("startvec", v1,"point",p, "pvec", v2, "angle", angle*180/pi)
+            #print("ref", (j, i),"point",p, "pvec", v2, "angle", angle*180/pi)
             if angle > maxangle: (maxangle, bestp, bestref) = (angle, p, (j, i))
         if [currentp, bestp] == newpointlist[:2]: break
         currentref = bestref
