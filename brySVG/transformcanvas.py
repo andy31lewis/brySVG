@@ -47,6 +47,10 @@ class TransformMixin(object):
                 obj.matrixTransform(matrix)
         elif isinstance(self, PointObject):
             self.XY = self.transformedpoint(matrix)
+        elif isinstance(self, PolygonObject):
+            self.pointList = self.transformedpointlist(matrix)
+            self._pointList = None
+            self._segments = None
         else:
             self.pointList = self.transformedpointlist(matrix)
             if isinstance(self, BezierObject): self.pointsetList = self.transformedpointsetlist(matrix)

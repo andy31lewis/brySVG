@@ -87,6 +87,15 @@ class Intersection(object):
         return s
 
 class PolygonMixin(object):
+    @property
+    def segments(self):
+        if isinstance(self, PolygonGroup): return self.boundary.segments
+        if self._segments is None:
+            #print(f"calculating segments for {self}")
+            L = len(self.pointList)
+            self._segments = [Segment(self.pointList[i-1], self.pointList[i], self, ((i-1)%L, i)) for i in range(L)]
+        return self._segments
+
     def containspoint(self, point, dp=1):
         '''Returns "interior" if point is inside the polygon, "edge" if it is on an edge,
         "vertex" if it is at a vertex, or False otherwise.
@@ -221,38 +230,48 @@ class PolygonCanvasMixin(object):
         #    self.deleteObject(self.objectDict["centre"])
         #except KeyError:
         #    pass
-        if not hasattr(svgobject, "pointList"): return
-        bbox = svgobject.getBBox()
-        L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+        if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return
         snapangle = self.snapAngle*pi/180
         snapd = self.snapDistance
         bestangle = None
-        L = len(svgobject.pointList)
-        objsegments = [Segment(svgobject.pointList[i-1], svgobject.pointList[i], svgobject, ((i-1)%L, i)) for i in range(L)]
-        objsegs = sorted(objsegments, key = lambda seg: seg.angle)
-        for seg in objsegs:
-            if seg.angle > snapangle - pi/2: break
-            newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
-            newseg.angle = seg.angle + pi
-            objsegs.append(newseg)
+        bbox = svgobject.getBBox()
+        L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+
         checksegs = []
+        checkobjs = []
         for objid in self.objectDict:
             if objid == svgobject.id: continue
             obj = self.objectDict[objid]
             if getattr(obj, "group", None): continue
             if not isinstance(obj, (PolygonObject, PolygonGroup)): continue
             bbox = obj.getBBox()
-            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-            if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
-            L = len(obj.pointList)
-            objsegments = [Segment(obj.pointList[i-1], obj.pointList[i], obj, ((i-1)%L, i)) for i in range(L)]
-            checksegs.extend(objsegments)
+            L2, R2, T2, B2 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+            if L2-R1 > snapd or R2-L1 < -snapd or T2-B1 > snapd or B2-T1 < -snapd: continue
+            #L = len(obj.pointList)
+            #objsegments = [Segment(obj.pointList[i-1], obj.pointList[i], obj, ((i-1)%L, i)) for i in range(L)]
+            checksegs.extend(obj.segments)
+            checkobjs.append(obj)
+        if not checksegs:
+            print("ES - disjoint", time.time()-tt)
+            return
         checksegs.sort(key = lambda seg: seg.angle)
         for seg in checksegs:
             if seg.angle > snapangle - pi/2: break
             newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
             newseg.angle = seg.angle + pi
             checksegs.append(newseg)
+
+        #L = len(svgobject.pointList)
+        #objsegs = [Segment(svgobject.pointList[i-1], svgobject.pointList[i], svgobject, ((i-1)%L, i)) for i in range(L)]
+        #objsegs.sort(key = lambda seg: seg.angle)
+        objsegs = sorted(svgobject.segments, key = lambda seg: seg.angle)
+        for seg in objsegs:
+            if seg.angle > snapangle - pi/2: break
+            newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
+            newseg.angle = seg.angle + pi
+            objsegs.append(newseg)
+
+        #print("ES - create segments", time.time()-tt)
         #print("objsegs")
         #for seg in objsegs: print(seg)
         #print("checksegs")
@@ -380,8 +399,8 @@ class PolygonCanvasMixin(object):
                     svgobject.translate((dx, dy))
                     break
         elif self.vertexSnap:
-            self.doVertexSnap(svgobject)
-        print("rotatesnap", time.time()-tt)
+            self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
+        print("ES - do snap", time.time()-tt)
 
 def _compareboundingboxes(poly1, poly2, xdp=None, ydp=None):
     def getboundingbox(poly):
@@ -449,13 +468,16 @@ def _getrotatedcoords(polylist, xdp):
     a = getbestangle(polylist)
     cosa, sina = cos(a), sin(a)
     #print("Best angle", a*180/pi)
-    xdp1 = xdp+1
-    #print(f"Before rotation:\nPoly1: {self.pointList}\nPoly2: {other.pointList}")
     coordslists = []
     for poly in polylist:
-        polyrounded = [(round(x, xdp1), round(y, xdp1)) for (x, y) in poly.pointList]
-        #print(f"\nAfter rounding before rotation:\n{polyrounded}")
-        polyrotated = poly.pointList if a == 0 else [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in polyrounded]
+        #print(f"Before rounding:{poly.pointList}")
+        if a == 0:
+            polyrotated = poly.pointList
+        else:
+            xdp1 = xdp+1
+            polyrounded = [(round(x, xdp1), round(y, xdp1)) for (x, y) in poly.pointList]
+            #print(f"\nAfter rounding before rotation:\n{polyrounded}")
+            polyrotated = [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in polyrounded]
         #print(f"After rotation:\n{polyrotated}")
 
         coords = [(round(x, xdp), y) for (x, y) in polyrotated]
@@ -647,7 +669,7 @@ def findintersections(polylist):
 
     #print("polylist:")
     #for poly in polylist: print(poly, poly.pointList)
-
+    tt = time.time()
     coordslists = _getrotatedcoords(polylist, xdp=dp)
 
     intersections = []
@@ -673,16 +695,15 @@ def findintersections(polylist):
         ixkey = round(ix.point, dp2)
         if ixkey in ixpoints:
             #print("combining with", ixpoints[ixkey])
-            #ixpoints[ixkey].polyrefs.update(ix.polyrefs)
-            for poly in ix.polyrefs:
-                index = ix.polyrefs[poly]
-                if (poly not in ixpoints[ixkey].polyrefs) or isinstance(index, int):
-                    ixpoints[ixkey].polyrefs[poly] = ix.polyrefs[poly]
+            existingrefs = ixpoints[ixkey].polyrefs
+            for poly, index in ix.polyrefs.items():
+                if (poly not in existingrefs) or isinstance(index, int):
+                    existingrefs[poly] = ix.polyrefs[poly]
                 else:
-                    oldindex = ixpoints[ixkey].polyrefs[poly]
+                    oldindex = existingrefs[poly]
                     if isinstance(oldindex, tuple) and index != oldindex:
                         (a,b), (c,d) = index, oldindex
-                        ixpoints[ixkey].polyrefs[poly] = b if b==c else a
+                        existingrefs[poly] = b if b==c else a
         else:
             ixpoints[ixkey] = ix
         #print("ixpoints so far:", ixpoints)
@@ -692,6 +713,7 @@ def findintersections(polylist):
             ix.selfindex, ix.otherindex = ix.index2, ix.index1
 
     #print("ixpoints", ixpoints)
+    #print("FI-construct intersections", time.time()-tt)
     return list(ixpoints.values())
 
 def boundary(polylist):
@@ -819,7 +841,7 @@ def boundary(polylist):
             if poly not in boundaryregion:
                 #print(f"{poly} not in boundaryregion")
                 if boundary.positionRelativeTo(poly) != Position.CONTAINS: return None
-    #print("check unused polys", time.time()-tt)
+    #print("B - check unused polys", time.time()-tt)
 
     return boundary
 

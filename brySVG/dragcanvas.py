@@ -49,13 +49,13 @@ class ObjectMixin(object):
             newobject = self.__class__()
         else:
             return None
-        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "segments"]:
-            attr = getattr(self, attrname, None)
-            if attr is None: continue
-            newattr = list(attr) if isinstance(attr, list) else attr
-            setattr(newobject, attrname, newattr)
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
+        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "_pointList", "_segments"]:
+            attr = getattr(self, attrname, "NO_SUCH_ATTRIBUTE")
+            if attr == "NO_SUCH_ATTRIBUTE": continue
+            newattr = list(attr) if isinstance(attr, list) else attr
+            setattr(newobject, attrname, newattr)
         newobject.id = ""
         return newobject
 
@@ -230,6 +230,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         svg.polygon.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
+        self._segments = None
         self.update()
 
     def update(self):
@@ -998,26 +999,28 @@ class CanvasObject(svg.svg):
                 svgobj = svgobj.group
         return svgobj
 
-    def doVertexSnap(self, svgobject):
+    def doVertexSnap(self, svgobject, checkpoints=None):
         tt = time.time()
         if not hasattr(svgobject, "pointList"): return
         snapd = self.snapDistance
         bestdx = bestdy = bestd = None
-        objpoints = sorted(svgobject.pointList, key=lambda p:p.coords)
         bbox = svgobject.getBBox()
         L, R, T, B = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
 
-        checkpoints = []
-        for objid in self.objectDict:
-            if objid == svgobject.id: continue
-            obj = self.objectDict[objid]
-            if not hasattr(obj, "pointList"): continue
-            if objgroup := getattr(obj, "group", None) and hasattr(objgroup, "pointList") : continue
-            bbox = obj.getBBox()
-            L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
-            if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
-            checkpoints.extend(obj.pointList)
+        if checkpoints is None:
+            checkpoints = []
+            for objid in self.objectDict:
+                if objid == svgobject.id: continue
+                obj = self.objectDict[objid]
+                if not hasattr(obj, "pointList"): continue
+                if objgroup := getattr(obj, "group", None) and hasattr(objgroup, "pointList") : continue
+                bbox = obj.getBBox()
+                L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
+                if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
+                checkpoints.extend(obj.pointList)
+        if not checkpoints: return
         checkpoints.sort(key=lambda p:p.coords)
+        objpoints = sorted(svgobject.pointList, key=lambda p:p.coords)
 
         checkstart = 0
         for i, point1 in enumerate(objpoints):
