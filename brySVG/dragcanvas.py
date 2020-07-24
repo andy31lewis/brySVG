@@ -10,7 +10,7 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT #
 # ANY WARRANTY. See the GNU General Public License for more details.          #
 import time
-from browser import document, alert
+from browser import document, alert, window
 import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot, floor, log10
 svgbase = svg.svg()
@@ -229,18 +229,41 @@ class PolygonObject(svg.polygon, ObjectMixin):
     pointlist: a list of coordinates for the vertices'''
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         svg.polygon.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
-        self.pointList = [Point(coords) for coords in pointlist]
+        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
+        self._pointList = None
         self._segments = None
-        self.update()
+        #self.update()
 
     def update(self):
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
+        pass
 
     def __repr__(self):
         return f"polygon {self.id}" if self.id else f"polygon {id(self)}"
 
     def __str__(self):
         return self.__repr__()
+
+    @property
+    def pointList(self):
+        if self._pointList is None:
+            #print(f"calculating pointList for {self}")
+            P = self.points
+            L = P.numberOfItems
+            self._pointList = [Point([P.getItem(i).x, P.getItem(i).y]) for i in range(L)]
+        return self._pointList
+
+    @pointList.setter
+    def pointList(self, pointlist):
+        self._pointList = pointlist
+        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
+
+    def transformpoints(self, points, matrix):
+        L = points.numberOfItems
+        for i in range(L):
+            pt = points.getItem(i)
+            newpt =  pt.matrixTransform(matrix)
+            points.replaceItem(newpt, i)
+        self._pointList = None
 
 class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:

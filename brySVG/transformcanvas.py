@@ -48,17 +48,18 @@ class TransformMixin(object):
         elif isinstance(self, PointObject):
             self.XY = self.transformedpoint(matrix)
         elif isinstance(self, PolygonObject):
-            self.pointList = self.transformedpointlist(matrix)
+            #window.transformpoints([self.points], matrix)
+            self.transformpoints(self.points, matrix)
             self._pointList = None
             self._segments = None
         else:
             self.pointList = self.transformedpointlist(matrix)
             if isinstance(self, BezierObject): self.pointsetList = self.transformedpointsetlist(matrix)
-            hittarget = getattr(self, "hitTarget", None)
-            if hittarget:
-                hittarget.pointList = self.pointList
-                if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
-                hittarget.update()
+        hittarget = getattr(self, "hitTarget", None)
+        if hittarget:
+            hittarget.pointList = self.pointList
+            if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
+            hittarget.update()
         self.update()
 
     def translate(self, vector):

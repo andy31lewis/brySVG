@@ -149,7 +149,7 @@ class PolygonMixin(object):
 class PolygonGroup(GroupObject, PolygonMixin):
     def __init__(self, objlist=[]):
         self.boundary = None
-        self.update()
+        #self.update()
         super().__init__(objlist)
 
     def __repr__(self):
@@ -209,13 +209,49 @@ class PolygonGroup(GroupObject, PolygonMixin):
         self.update()
         super().deleteAll()
 
-    def update(self):
-        self.pointList = [] if self.boundary is None else self.boundary.pointList
+    @property
+    def pointList(self):
+        return [] if self.boundary is None else self.boundary.pointList
 
+    @pointList.setter
+    def pointList(self, pointlist):
+        pass
+
+    @property
+    def points(self):
+        return None if self.boundary is None else self.boundary.points
+
+    def matrixTransform(self, matrix):
+        def addalltopointslist(group):
+            for obj in group.objectList:
+                if isinstance(obj, PolygonGroup):
+                    addalltopointslist(obj)
+                else:
+                    pointslist.append(obj.points)
+                    obj._pointList = None
+                    obj._segments = None
+            pointslist.append(group.boundary.points)
+            group.boundary._pointList = None
+            group.boundary._segments = None
+
+        pointslist = []
+        addalltopointslist(self)
+        self.transformpoints(pointslist, matrix)
+
+    def transformpoints(self, pointslist, matrix):
+        for points in pointslist:
+            L = points.numberOfItems
+            for i in range(L):
+                pt = points.getItem(i)
+                newpt =  pt.matrixTransform(matrix)
+                points.replaceItem(newpt, i)
+
+    """
     def matrixTransform(self, matrix):
         self.boundary.matrixTransform(matrix)
         super().matrixTransform(matrix)
         #print("Pointlist after drag/rotate", self.pointList)
+    """
 
     def cloneObject(self):
         newobject = super().cloneObject()
@@ -671,10 +707,13 @@ def findintersections(polylist):
     #for poly in polylist: print(poly, poly.pointList)
     tt = time.time()
     coordslists = _getrotatedcoords(polylist, xdp=dp)
+    #print("FI-getrotatedcoords", time.time()-tt)
 
     intersections = []
     usedpoints = set()
     unusedsegments = _getsortedsegments(polylist, coordslists)
+    #print("FI-getsortedsegments", time.time()-tt)
+
     #print("\nSegments at start:")
     #for seg in unusedsegments: print(seg)
     livesegments = []
@@ -682,6 +721,7 @@ def findintersections(polylist):
     #print("\nxValues", xvalues)
     for x in xvalues: #Vertical sweepline stops at each vertex of either polygon
         livesegments = sweeppast(x, livesegments)
+    #print("FI-sweeppast", time.time()-tt)
 
     ixpoints = {}
     for ix in intersections:
