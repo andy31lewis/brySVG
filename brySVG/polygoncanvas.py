@@ -175,10 +175,14 @@ class PolygonGroup(GroupObject, PolygonMixin):
         self.update()
         return True
 
-    def addObjects(self, polylist):
+    def addObjects(self, polylist, listboundary=None):
         if polylist == []: return None
-        if self.boundary: polylist.append(self.boundary)
-        newboundary = boundary(polylist)
+        blist = [self.boundary] if self.boundary else []
+        if listboundary:
+            blist.append(listboundary)
+        else:
+            blist.extend(polylist)
+        newboundary = listboundary if len(blist) == 1 else boundary(blist)
         if newboundary is False:
             return False
         elif newboundary is None:
@@ -480,11 +484,12 @@ def _getrotatedcoords(polylist, xdp):
     def getbestangle(polylist):
         anglesfromvertical = []
         for poly in polylist:
-            vecs = [poly.pointList[i] - poly.pointList[i-1] for i in range(len(poly.pointList))]
-            anglesfromvertical.extend([abs(atan2(dy, dx)-pi/2+pi*(dy<0)) for (dx, dy) in vecs])
+            segs = poly.segments
+            anglesfromvertical.extend([abs(seg.angle) for seg in segs])
+        #print("angles", [a*180/pi for a in anglesfromvertical])
         if 0 not in anglesfromvertical: return 0
         positiveangles = [a for a in anglesfromvertical if a>0.1]
-        return min(positiveangles)/2
+        return round(min(positiveangles)/2, 1)
 
     a = getbestangle(polylist)
     cosa, sina = cos(a), sin(a)
@@ -495,11 +500,16 @@ def _getrotatedcoords(polylist, xdp):
         if a == 0:
             polyrotated = poly.pointList
         else:
-            xdp1 = xdp+1
-            polyrounded = [(round(x, xdp1), round(y, xdp1)) for (x, y) in poly.pointList]
-            #print(f"\nAfter rounding before rotation:\n{polyrounded}")
-            polyrotated = [(x*cosa-y*sina, x*sina+y*cosa) for (x, y) in polyrounded]
-        #print(f"After rotation:\n{polyrotated}")
+            polyrotated = []
+            t = svgbase.createSVGTransform()
+            t.setRotate(a*180/pi, 5500, 5500)
+            M = t.matrix
+            P = poly.points
+            L = P.numberOfItems
+            for i in range(L):
+                pt = P.getItem(i)
+                newpt =  pt.matrixTransform(M)
+                polyrotated.append((newpt.x, newpt.y))
 
         coords = [(round(x, xdp), y) for (x, y) in polyrotated]
         coordslists.append(coords)
@@ -580,10 +590,10 @@ def relativeposition(self, other):
                 latestoutcome = Position.DISJOINT
         return latestoutcome, livesegments
 
-    coordslist1, coordslist2 = _getrotatedcoords([self, other], xdp=dp)
+    polyA, polyB = getattr(self, "boundary", self), getattr(other, "boundary", other)
+    coordslist1, coordslist2 = _getrotatedcoords([polyA, polyB], xdp=dp)
 
     transposed = False
-    polyA, polyB = self, other
     bboxresult = _compareboundingboxes(coordslist1, coordslist2, ydp=dp)
     #print("Bboxresult:", bboxresult)
     if bboxresult in {Position.DISJOINT, Position.TOUCHING}: return Position.DISJOINT
@@ -591,19 +601,18 @@ def relativeposition(self, other):
         if _equalpolygons(coordslist1, coordslist2): return Position.EQUAL
         elif _area(coordslist2) > _area(coordslist1):
             coordslist1, coordslist2 = coordslist2, coordslist1
-            polyA, polyB = other, self
+            polyA, polyB = polyB, polyA
             transposed = True
     if bboxresult == Position.INSIDE:
         coordslist1, coordslist2 = coordslist2, coordslist1
-        polyA, polyB = other, self
+        polyA, polyB = polyB, polyA
         transposed = True
 
     #print("Transposed", transposed)
     unusedsegments = _getsortedsegments([polyA, polyB], [coordslist1, coordslist2])
     #print("segments", time.time()-tt)
     #print("\nSegments at start:")
-    #for seg in unusedsegments:
-        #print(seg)
+    #for seg in unusedsegments: print(seg)
     livesegments = []
     currentoutcome = None
     xvalues = sorted(set(x for (x, y) in coordslist1+coordslist2))
@@ -707,6 +716,7 @@ def findintersections(polylist):
     #print("polylist:")
     #for poly in polylist: print(poly, poly.pointList)
     tt = time.time()
+    polylist = [getattr(poly, "boundary", poly) for poly in polylist]
     coordslists = _getrotatedcoords(polylist, xdp=dp)
     #print("FI-getrotatedcoords", time.time()-tt)
 
@@ -727,6 +737,7 @@ def findintersections(polylist):
 
 def boundary(polylist):
     tt = time.time()
+    polylist = [getattr(poly, "boundary", poly) for poly in polylist]
     ixlist = findintersections(polylist)
     #print("B-findintersections", time.time()-tt)
     if ixlist == []:
