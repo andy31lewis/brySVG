@@ -1033,26 +1033,26 @@ class CanvasObject(svg.svg):
                 if L1-R > snapd or R1-L < -snapd or T1-B > snapd or B1-T < -snapd: continue
                 checkpoints.extend(obj.pointList)
         if not checkpoints: return
-        checkpoints.sort(key=lambda p:p.coords)
+        checkpoints.sort(key=lambda p:p.coords) #all points which could possibly be snapped to
         objpoints = sorted(svgobject.pointList, key=lambda p:p.coords)
 
         checkstart = 0
-        for i, point1 in enumerate(objpoints):
-            checkpoints = checkpoints[checkstart:]
+        for i, point1 in enumerate(objpoints): #vertical sweepline stops at each x-coord of object to be snapped
+            checkpoints = checkpoints[checkstart:] #remove points too far to the left of sweepline
             if not checkpoints: break
             try:
-                (tonextx, y) = objpoints[i+1] - point1
+                (tonextx, y) = objpoints[i+1] - point1 #find distance between current and next position of sweepline
             except IndexError:
                 tonextx = 0
             checkstart = 0
-            for point2 in checkpoints:
+            for point2 in checkpoints: #start checking
                 (dx, dy) = point2 - point1
                 if abs(dx) < snapd and abs(dy) < snapd:
                     d = hypot(dx, dy)
                     if bestd is None or d < bestd: (bestd, bestdx, bestdy) = (d, dx, dy)
-                if tonextx - dx > snapd: checkstart += 1
-                if dx > snapd: break
-        if bestd: self.translateObject(svgobject, Point((bestdx, bestdy)))
+                if tonextx - dx > snapd: checkstart += 1 #point just checked will be too far to the left when sweepline moves on
+                if dx > snapd: break #point just checked is too far to the right of sweepline - time to move sweepline on
+        if bestd: self.translateObject(svgobject, (bestdx, bestdy))
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''

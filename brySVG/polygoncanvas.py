@@ -277,15 +277,15 @@ class PolygonCanvasMixin(object):
         if not checksegs:
             print("ES-disjoint", time.time()-tt)
             return
-        checksegs.sort(key = lambda seg: seg.angle)
-        for seg in checksegs:
+        checksegs.sort(key = lambda seg: seg.angle) #all segments which could possibly be snapped to, sorted by angle from vertical
+        for seg in checksegs: #if any segments have an angle within snapangle of -pi/2, create a copy with equaivalent angle close to +pi/2
             if seg.angle > snapangle - pi/2: break
             newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
             newseg.angle = seg.angle + pi
             checksegs.append(newseg)
 
         objsegs = sorted(svgobject.segments, key = lambda seg: seg.angle)
-        for seg in objsegs:
+        for seg in objsegs: #do the same for the object being snapped
             if seg.angle > snapangle - pi/2: break
             newseg = Segment(seg.leftpoint, seg.rightpoint, seg.poly, seg.index)
             newseg.angle = seg.angle + pi
@@ -299,19 +299,19 @@ class PolygonCanvasMixin(object):
         checkstart = 0
         piby4 = pi/4
         found = False
-        for i, seg1 in enumerate(objsegs):
+        for i, seg1 in enumerate(objsegs): #sweep stops at the angle of each segment of object to be snapped
             angle1 = seg1.angle
             #print("\nChecking:", angle1)
-            checksegs = checksegs[checkstart:]
+            checksegs = checksegs[checkstart:] #remove segments with angle << angle of object segments
             if not checksegs: break
             #print("check angles", [seg.angle for seg  in checksegs])
             try:
-                tonextangle = objsegs[i+1].angle - angle1
+                tonextangle = objsegs[i+1].angle - angle1 #find amount between current and next angle in the sweep
             except IndexError:
                 tonextangle = 0
             #print("tonextangle", tonextangle)
             checkstart = 0
-            for seg2 in checksegs:
+            for seg2 in checksegs: #start checking segments within snapangle of the current object segment
                 angle2 = seg2.angle
                 #print("Against:", angle2)
                 angled = angle2 - angle1
@@ -320,12 +320,12 @@ class PolygonCanvasMixin(object):
                 absangle = abs(angled)
                 if (bestangle is None and absangle < snapangle) or (bestangle is not None and absangle < bestangle):
                     #print("Angles close enough")
-                    (objleft, objright) = (seg1.leftx, seg1.rightx)
+                    (objleft, objright) = (seg1.leftx, seg1.rightx) #First check bounding boxes - if disjoint, ignore segment
                     (objtop, objbottom) = (seg1.top, seg1.bottom)
                     (checkleft, checkright) = (seg2.leftx-snapd, seg2.rightx+snapd)
                     (checktop, checkbottom) = (seg2.top-snapd, seg2.bottom+snapd)
                     if not (objleft > checkright or objright < checkleft or objtop > checkbottom or objbottom < checktop):
-                        objp, objq = seg1.leftpoint, seg1.rightpoint
+                        objp, objq = seg1.leftpoint, seg1.rightpoint #Next check whether segments intersect ...
                         checkp, checkq = seg2.leftpoint, seg2.rightpoint
                         #print("Not disjoint segments")
                         #print("obj:", seg1)
@@ -334,10 +334,10 @@ class PolygonCanvasMixin(object):
                         diff, product = checkp - objp, objv.cross(checkv)
                         (t, u) = (diff.cross(objv)/product, diff.cross(checkv)/product) if product != 0 else (inf, inf)
                         #print("t and u", t, u)
-                        if 0<=t<=1 and 0<=u<=1:
+                        if 0<=t<=1 and 0<=u<=1: #... if so, distance between them is 0
                             (bestangle, angle, centre, vector, objseg, checkseg) = (absangle, angled, objp + u*objv, (0, 0), seg1, seg2)
-                        else:
-                            bestd = None
+                        else: #... if not, check how close each endpoint of segment is to the other segment,
+                            bestd = None #vertically or horizontally depending on the angle of the segment
                             (objx1, objy1), (objx2, objy2) = objp, objq
                             (checkx1, checky1), (checkx2, checky2) = checkp, checkq
                             if abs(angle2) < piby4:
@@ -394,21 +394,21 @@ class PolygonCanvasMixin(object):
                                         (bestangle, angle, centre, vector, objseg, checkseg) = (absangle, angled, (checkx2, objy), (0, diff), seg1, seg2)
                 #if bestangle: print("Current best angle and vector", angled, vector)
                 if tonextangle - angled > snapangle:
-                    checkstart += 1
+                    checkstart += 1 #angle just checked will be too small when sweep moves on
                     #print("New checkstart", checkstart)
                 if angled > snapangle:
                     #print("Finished checking", angle1)
-                    break
+                    break #angle just checked is too great - time to move sweep on
                 if bestangle == 0:
-                    found = True
+                    found = True #Angle of 0 can't be beaten, so abort search at this sweep point...
                     break
-            if found: break
+            if found: break #... and abort sweep completely
         #print("ES-findbestsnap", time.time()-tt)
 
-        if bestangle is not None:
+        if bestangle is not None: #First snap the edges together
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
             if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
-            if not self.vertexSnap: return
+            if not self.vertexSnap: return #Then if required, try to snap the vertices
             objpoints = [svgobject.pointList[objseg.leftindex], svgobject.pointList[objseg.rightindex]]
             checkpoints = [checkseg.leftpoint, checkseg.rightpoint]
             pointpairs = [(p1, p2) for p1 in objpoints for p2 in checkpoints]
@@ -418,7 +418,7 @@ class PolygonCanvasMixin(object):
                     #print(f"Snap {point1} to {point2}")
                     svgobject.translate((dx, dy))
                     break
-        elif self.vertexSnap:
+        elif self.vertexSnap: #Even if we can't snap the edges, can still try to snap the vertices
             self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
         print("ES-dosnap", time.time()-tt)
 
@@ -645,46 +645,43 @@ def findintersections(polylist):
         #print("\nLive segments (start of sweeppast):")
         #for seg in livesegments: print(seg)
 
-        for i, seg in enumerate(livesegments):
-            for seg2 in livesegments[i+1:]:
+        for i, seg in enumerate(livesegments): #for each live segment,
+            for seg2 in livesegments[i+1:]: #look at all segments whose y-coord was previously >= this segment's y-coord
                 #print(f"Comparing:\n{seg}\nwith\n{seg2}")
-                #if (seg.y, seg.gradient) > (seg2.y, seg2.gradient) and seg.poly != seg2.poly:
                 if seg.y == inf or seg2.y == inf: continue
-                if seg.y > seg2.y and seg.poly != seg2.poly:
+                if seg.y > seg2.y and seg.poly != seg2.poly: #if this segment's y-coord  is now greater, they must have crossed
                     #print("Found intersection")
                     intersections.append(Intersection(seg.poly, seg.index, seg2.poly, seg2.index))
 
         newsegments = []
-        while unusedsegments and unusedsegments[0].leftx == x:
+        while unusedsegments and unusedsegments[0].leftx == x: #get any segments which start at this value of x
             newseg = unusedsegments.pop(0)
             newseg.y = round(newseg.lefty, dp2)
             newseg.xpos = "L"
             newseg.currentindex = newseg.leftindex
             newsegments.append(newseg)
 
-        livesegments.sort(key=lambda seg: seg.y)
-        livesegments = mergelists(livesegments, newsegments)
+        livesegments.sort(key=lambda seg: seg.y) #sort live segments based on y-coord (but not gradient; may be about to cross)
+        livesegments = mergelists(livesegments, newsegments) #merge the new segments based on y-coord and gradient
         #print("\nLive segments (with new added):")
         #for seg in livesegments: print(seg)
 
         segiter = iter(livesegments)
         seg = next(segiter, None)
-        while seg is not None:
+        while seg is not None: #look for segments whose current y-coord is the same
             prevseg = seg
             seg = next(segiter, None)
             if seg is None: break
             #print("\nPrevseg:", prevseg, "\nSeg:", seg)
-            #if (x, seg.y) in usedpoints: continue
             if seg.y == prevseg.y and seg.poly != prevseg.poly:
-                #if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"} or round(seg.gradient, dp2) != round(prevseg.gradient, dp2):
-                if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"}:
+                if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"}: #but if the current position is in the middle of both segments, they could just be collinear
                     #print("found intersection")
                     intersections.append(Intersection(seg.poly, seg.currentindex, prevseg.poly, prevseg.currentindex))
                     #usedpoints.add((x, seg.y))
                     #while seg and seg.y == prevseg.y:
                     #    seg = next(segiter, None)
 
-        livesegments = [seg for seg in livesegments if seg.xpos != "R"]
+        livesegments = [seg for seg in livesegments if seg.xpos != "R"] #remove segments which are finished with
         return livesegments
 
     #print("polylist:")
@@ -805,7 +802,6 @@ def boundary(polylist):
             insert = ixdicts[j][index]
             pl = pointlists[j]
             if pl[k] < pl[i]: insert.reverse()
-            #if pointlists[j][k] < pointlists[j][i]: insert.reverse()
             reflists[j][i+offset:i+offset] = insert
             offset += len(insert)
 
