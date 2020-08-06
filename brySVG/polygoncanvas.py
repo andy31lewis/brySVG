@@ -66,12 +66,9 @@ class Segment(object):
         return f"{self.poly}{self.index}: [{self.leftpoint}, {self.rightpoint}]; currenty: {self.y}, xpos: {self.xpos}, gradient: {self.gradient}, angle: {self.angle}"
 
 class Intersection(object):
-    def __init__(self, poly1, index1, poly2, index2, point=None):
+    def __init__(self, polyrefs, point=None):
+        (poly1, index1), (poly2, index2) = polyrefs
         self.polyrefs = {poly1:index1, poly2:index2}
-        self.poly1 = poly1
-        self.index1 = index1
-        self.poly2 = poly2
-        self.index2 = index2
         self.point = point if point is not None else Point((0, 0))
 
     def __repr__(self):
@@ -141,7 +138,11 @@ class PolygonMixin(object):
                     if this is a tuple (i-1, i), the intersection is between self.pointList[i-1] and self.pointList[i]
         .otherindex: same as selfindex but describes the location of the intersection on the other polygon.
         '''
-        return findintersections([self, other])
+        ixlist = findintersections([self, other])
+        for ix in ixlist:
+            polyrefs = ix.polyrefs
+            ix.selfindex, ix.otherindex = polyrefs[self], polyrefs[other]
+        return ixlist
 
     def merge(self, other):
         return boundary([self, other])
@@ -619,10 +620,11 @@ def relativeposition(self, other):
 def findintersections(polylist):
     '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
     other is another PolygonObject.'''
-    def calculatepoint(ix):
-        (i1a, i1b), (i2a, i2b) = ix.index1, ix.index2
-        p1, p2 = ix.poly1.pointList[i1a], ix.poly2.pointList[i2a]
-        v1, v2 = ix.poly1.pointList[i1b] - p1, ix.poly2.pointList[i2b] - p2
+    def calculatepoint(polyrefs):
+        (poly1, index1), (poly2, index2) = polyrefs
+        (i1a, i1b), (i2a, i2b) = index1, index2
+        p1, p2 = poly1.pointList[i1a], poly2.pointList[i2a]
+        v1, v2 = poly1.pointList[i1b] - p1, poly2.pointList[i2b] - p2
         #print("Poly1", p1, v1, "Poly2", p2, v2)
         #print("indexes", ix.index1, ix.index2)
         #print("cross of vectors", v1.cross(v2))
@@ -631,8 +633,26 @@ def findintersections(polylist):
         point = p1+t*v1
         return point
 
-    def sweeppast(x, livesegments):
-        for seg in livesegments:
+    def addtoixdict(point, polyrefs):
+        ixkey = round(point, dp2)
+        if ixkey in ixpoints:
+            #print("combining with", ixpoints[ixkey])
+            existingrefs = ixpoints[ixkey].polyrefs
+            for poly, index in polyrefs:
+                if (poly not in existingrefs) or isinstance(index, int):
+                    existingrefs[poly] = index
+                else:
+                    oldindex = existingrefs[poly]
+                    if isinstance(oldindex, tuple) and index != oldindex:
+                        (a,b), (c,d) = index, oldindex
+                        existingrefs[poly] = b if b==c else a
+        else:
+            #print("creating new")
+            ixpoints[ixkey] = Intersection(polyrefs, point)
+            #print(ixpoints[ixkey])
+
+    def sweeppast(x, livesegments): #move to next value of x
+        for seg in livesegments: #For all live segments, work out the current y coord
             if seg.rightx == x:
                 seg.y = round(seg.righty, dp2)
                 seg.xpos = "R"
@@ -651,7 +671,9 @@ def findintersections(polylist):
                 if seg.y == inf or seg2.y == inf: continue
                 if seg.y > seg2.y and seg.poly != seg2.poly: #if this segment's y-coord  is now greater, they must have crossed
                     #print("Found intersection")
-                    intersections.append(Intersection(seg.poly, seg.index, seg2.poly, seg2.index))
+                    polyrefs = [(seg.poly, seg.index), (seg2.poly, seg2.index)]
+                    point = calculatepoint(polyrefs)
+                    addtoixdict(point, polyrefs)
 
         newsegments = []
         while unusedsegments and unusedsegments[0].leftx == x: #get any segments which start at this value of x
@@ -676,10 +698,8 @@ def findintersections(polylist):
             if seg.y == prevseg.y and seg.poly != prevseg.poly:
                 if seg.xpos in {"L","R"} or prevseg.xpos in {"L","R"}: #but if the current position is in the middle of both segments, they could just be collinear
                     #print("found intersection")
-                    intersections.append(Intersection(seg.poly, seg.currentindex, prevseg.poly, prevseg.currentindex))
-                    #usedpoints.add((x, seg.y))
-                    #while seg and seg.y == prevseg.y:
-                    #    seg = next(segiter, None)
+                    point = seg.poly.pointList[seg.currentindex] if seg.xpos in {"L","R"} else prevseg.poly.pointList[prevseg.currentindex]
+                    addtoixdict(point, [(seg.poly, seg.currentindex), (prevseg.poly, prevseg.currentindex)])
 
         livesegments = [seg for seg in livesegments if seg.xpos != "R"] #remove segments which are finished with
         return livesegments
@@ -690,13 +710,12 @@ def findintersections(polylist):
     coordslists = _getrotatedcoords(polylist, xdp=dp)
     #print("FI-getrotatedcoords", time.time()-tt)
 
-    intersections = []
-    usedpoints = set()
     unusedsegments = _getsortedsegments(polylist, coordslists)
     #print("FI-getsortedsegments", time.time()-tt)
 
     #print("\nSegments at start:")
     #for seg in unusedsegments: print(seg)
+    ixpoints = {}
     livesegments = []
     xvalues = sorted(set(x for coordslist in coordslists for (x, y) in coordslist))
     #print("\nxValues", xvalues)
@@ -704,37 +723,6 @@ def findintersections(polylist):
         livesegments = sweeppast(x, livesegments)
     #print("FI-sweeppast", time.time()-tt)
 
-    ixpoints = {}
-    for ix in intersections:
-        if isinstance(ix.index1, int):
-            ix.point = ix.poly1.pointList[ix.index1]
-        elif isinstance(ix.index2, int):
-            ix.point = ix.poly2.pointList[ix.index2]
-        else:
-            ix.point = calculatepoint(ix)
-        #print(ix)
-        ixkey = round(ix.point, dp2)
-        if ixkey in ixpoints:
-            #print("combining with", ixpoints[ixkey])
-            existingrefs = ixpoints[ixkey].polyrefs
-            for poly, index in ix.polyrefs.items():
-                if (poly not in existingrefs) or isinstance(index, int):
-                    existingrefs[poly] = ix.polyrefs[poly]
-                else:
-                    oldindex = existingrefs[poly]
-                    if isinstance(oldindex, tuple) and index != oldindex:
-                        (a,b), (c,d) = index, oldindex
-                        existingrefs[poly] = b if b==c else a
-        else:
-            ixpoints[ixkey] = ix
-        #print("ixpoints so far:", ixpoints)
-        if ix.poly1 == polylist[0]:
-            ix.selfindex, ix.otherindex = ix.index1, ix.index2
-        else:
-            ix.selfindex, ix.otherindex = ix.index2, ix.index1
-
-    #print("ixpoints", ixpoints)
-    #print("FI-constructintersections", time.time()-tt)
     return list(ixpoints.values())
 
 def boundary(polylist):
