@@ -90,7 +90,7 @@ class PolygonMixin(object):
     @property
     def segments(self):
         if isinstance(self, PolygonGroup): return self.boundary.segments
-        if self._segments is None:
+        if getattr(self, "_segments", None) is None:
             #print(f"calculating segments for {self}")
             L = len(self.pointList)
             self._segments = [Segment(self.pointList[i-1], self.pointList[i], self, ((i-1)%L, i)) for i in range(L)]
@@ -149,7 +149,6 @@ class PolygonMixin(object):
 class PolygonGroup(GroupObject, PolygonMixin):
     def __init__(self, objlist=[]):
         self.boundary = None
-        #self.update()
         super().__init__(objlist)
 
     def __repr__(self):
@@ -236,6 +235,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
 
         pointslist = []
         addalltopointslist(self)
+        #window.transformpoints(pointslist, matrix)
         self.transformpoints(pointslist, matrix)
 
     def transformpoints(self, pointslist, matrix):
@@ -246,13 +246,6 @@ class PolygonGroup(GroupObject, PolygonMixin):
                 newpt =  pt.matrixTransform(matrix)
                 points.replaceItem(newpt, i)
 
-    """
-    def matrixTransform(self, matrix):
-        self.boundary.matrixTransform(matrix)
-        super().matrixTransform(matrix)
-        #print("Pointlist after drag/rotate", self.pointList)
-    """
-
     def cloneObject(self):
         newobject = super().cloneObject()
         newobject.boundary = self.boundary.cloneObject()
@@ -262,10 +255,6 @@ class PolygonGroup(GroupObject, PolygonMixin):
 class PolygonCanvasMixin(object):
     def doEdgeSnap(self, svgobject):
         tt = time.time()
-        #try:
-        #    self.deleteObject(self.objectDict["centre"])
-        #except KeyError:
-        #    pass
         if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return
         snapangle = self.snapAngle*pi/180
         snapd = self.snapDistance
@@ -283,12 +272,10 @@ class PolygonCanvasMixin(object):
             bbox = obj.getBBox()
             L2, R2, T2, B2 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
             if L2-R1 > snapd or R2-L1 < -snapd or T2-B1 > snapd or B2-T1 < -snapd: continue
-            #L = len(obj.pointList)
-            #objsegments = [Segment(obj.pointList[i-1], obj.pointList[i], obj, ((i-1)%L, i)) for i in range(L)]
             checksegs.extend(obj.segments)
             checkobjs.append(obj)
         if not checksegs:
-            print("ES - disjoint", time.time()-tt)
+            print("ES-disjoint", time.time()-tt)
             return
         checksegs.sort(key = lambda seg: seg.angle)
         for seg in checksegs:
@@ -297,9 +284,6 @@ class PolygonCanvasMixin(object):
             newseg.angle = seg.angle + pi
             checksegs.append(newseg)
 
-        #L = len(svgobject.pointList)
-        #objsegs = [Segment(svgobject.pointList[i-1], svgobject.pointList[i], svgobject, ((i-1)%L, i)) for i in range(L)]
-        #objsegs.sort(key = lambda seg: seg.angle)
         objsegs = sorted(svgobject.segments, key = lambda seg: seg.angle)
         for seg in objsegs:
             if seg.angle > snapangle - pi/2: break
@@ -307,7 +291,7 @@ class PolygonCanvasMixin(object):
             newseg.angle = seg.angle + pi
             objsegs.append(newseg)
 
-        #print("ES - create segments", time.time()-tt)
+        #print("ES-createsegments", time.time()-tt)
         #print("objsegs")
         #for seg in objsegs: print(seg)
         #print("checksegs")
@@ -419,12 +403,12 @@ class PolygonCanvasMixin(object):
                     found = True
                     break
             if found: break
+        #print("ES-findbestsnap", time.time()-tt)
 
         if bestangle is not None:
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
             if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
             if not self.vertexSnap: return
-            #transformmemo.clear()
             objpoints = [svgobject.pointList[objseg.leftindex], svgobject.pointList[objseg.rightindex]]
             checkpoints = [checkseg.leftpoint, checkseg.rightpoint]
             pointpairs = [(p1, p2) for p1 in objpoints for p2 in checkpoints]
@@ -436,7 +420,7 @@ class PolygonCanvasMixin(object):
                     break
         elif self.vertexSnap:
             self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
-        print("ES - do snap", time.time()-tt)
+        print("ES-dosnap", time.time()-tt)
 
 def _compareboundingboxes(poly1, poly2, xdp=None, ydp=None):
     def getboundingbox(poly):
@@ -753,13 +737,13 @@ def findintersections(polylist):
             ix.selfindex, ix.otherindex = ix.index2, ix.index1
 
     #print("ixpoints", ixpoints)
-    #print("FI-construct intersections", time.time()-tt)
+    #print("FI-constructintersections", time.time()-tt)
     return list(ixpoints.values())
 
 def boundary(polylist):
     tt = time.time()
     ixlist = findintersections(polylist)
-    #print("find intersections", time.time()-tt)
+    #print("B-findintersections", time.time()-tt)
     if ixlist == []:
         maxarea = 0
         for poly in polylist:
@@ -829,7 +813,7 @@ def boundary(polylist):
     for j in range(L):
         last = len(reflists[j]) - 1
         for i in range(last+1): vertexdict[reflists[j][i]].update({reflists[j][i-1], reflists[j][(i+1) if i<last else 0]})
-    #print("make vertexdict", time.time()-tt)
+    #print("B-makevertexdict", time.time()-tt)
     #print("vertexdict")
     #for point in vertexdict:
     #    (j, i) = point
@@ -872,7 +856,7 @@ def boundary(polylist):
         usedrefs.add((currentref, v1))
         (j, i) = currentref
     #print("New pointlist", newpointlist)
-    #print("construct boundary", time.time()-tt)
+    #print("B-constructboundary", time.time()-tt)
 
     if currentp != start: return False
     boundary = PolygonObject(newpointlist[:-1])
@@ -881,7 +865,7 @@ def boundary(polylist):
             if poly not in boundaryregion:
                 #print(f"{poly} not in boundaryregion")
                 if boundary.positionRelativeTo(poly) != Position.CONTAINS: return None
-    #print("B - check unused polys", time.time()-tt)
+    #print("B-checkunusedpolys", time.time()-tt)
 
     return boundary
 

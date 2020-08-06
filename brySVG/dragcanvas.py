@@ -15,7 +15,6 @@ import browser.svg as svg
 from math import sin, cos, atan2, pi, hypot, floor, log10
 svgbase = svg.svg()
 basepoint = svgbase.createSVGPoint()
-transformmemo = {}
 lasttaptime = 0
 fixeddefault = False
 
@@ -47,15 +46,16 @@ class ObjectMixin(object):
                     newobject.objectList.append(newobj)
         elif isinstance(self, ObjectMixin):
             newobject = self.__class__()
+            for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed"]:
+                attr = getattr(self, attrname, "NO_SUCH_ATTRIBUTE")
+                if attr == "NO_SUCH_ATTRIBUTE": continue
+                newattr = list(attr) if isinstance(attr, list) else attr
+                setattr(newobject, attrname, newattr)
         else:
             return None
+
         for (key, value) in self.attrs.items():
             newobject.attrs[key] = value
-        for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "_pointList", "_segments"]:
-            attr = getattr(self, attrname, "NO_SUCH_ATTRIBUTE")
-            if attr == "NO_SUCH_ATTRIBUTE": continue
-            newattr = list(attr) if isinstance(attr, list) else attr
-            setattr(newobject, attrname, newattr)
         newobject.id = ""
         return newobject
 
@@ -72,7 +72,6 @@ class ObjectMixin(object):
             if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
             hittarget.update()
 
-    """ ***Superseded by version below***
     def transformedpointlist(self, matrix):
         '''Not intended to be called by end users.'''
         newpointlist = []
@@ -80,24 +79,6 @@ class ObjectMixin(object):
             (basepoint.x, basepoint.y) = point
             newpt =  basepoint.matrixTransform(matrix)
             newpointlist.append(Point((newpt.x, newpt.y)))
-        return newpointlist
-
-    """
-    #Customised for speed when snapping large groups of polygons
-    def transformedpointlist(self, matrix):
-        '''Not intended to be called by end users.'''
-        newpointlist = []
-        for point in self.pointList:
-            h = hash(tuple(point.coords))
-            if h in transformmemo:
-                newpoint = transformmemo[h]
-                #print("Using memo")
-            else:
-                (basepoint.x, basepoint.y) = point
-                newpt =  basepoint.matrixTransform(matrix)
-                transformmemo[h] = newpoint = Point((newpt.x, newpt.y))
-            #print(point, "to", newpoint)
-            newpointlist.append(newpoint)
         return newpointlist
 
 class SmoothBezierMixin(object):
@@ -230,9 +211,6 @@ class PolygonObject(svg.polygon, ObjectMixin):
     def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
         svg.polygon.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
-        self._pointList = None
-        self._segments = None
-        #self.update()
 
     def update(self):
         pass
@@ -245,7 +223,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
     @property
     def pointList(self):
-        if self._pointList is None:
+        if getattr(self, "_pointList", None) is None:
             #print(f"calculating pointList for {self}")
             P = self.points
             L = P.numberOfItems
@@ -257,13 +235,28 @@ class PolygonObject(svg.polygon, ObjectMixin):
         self._pointList = pointlist
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
+    def cloneObject(self):
+        newobject = self.__class__()
+        for (key, value) in self.attrs.items():
+            newobject.attrs[key] = value
+        newobject.id = ""
+
+        P = self.points
+        P2 = newobject.points
+        L = P.numberOfItems
+        P2.clear()
+        for i in range(L):
+            pt = P.getItem(i)
+            P2.appendItem(pt)
+
+        return newobject
+
     def transformpoints(self, points, matrix):
         L = points.numberOfItems
         for i in range(L):
             pt = points.getItem(i)
             newpt =  pt.matrixTransform(matrix)
             points.replaceItem(newpt, i)
-        self._pointList = None
 
 class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
@@ -497,7 +490,7 @@ class RegularPolygon(PolygonObject):
     EITHER radius: the radius of the polygon, OR sidelength: the length of each side
     offsetangle: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.'''
     def __init__(self, sidecount=0, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
-        self.pointList = []
+        pointlist = []
         if sidecount>0:
             angle = 2*pi/sidecount
             radoffset = offsetangle*pi/180
@@ -506,11 +499,10 @@ class RegularPolygon(PolygonObject):
                 (x, y) = startpoint
                 centre = (x-radius*sin(radoffset), y+radius*cos(radoffset))
             (cx, cy) = centre
-            self.pointList = []
             for i in range(sidecount):
                 t = radoffset+i*angle
-                self.pointList.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
-        PolygonObject.__init__(self, self.pointList, linecolour, linewidth, fillcolour)
+                pointlist.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
+        PolygonObject.__init__(self, pointlist, linecolour, linewidth, fillcolour)
 
 class GroupObject(svg.g, ObjectMixin):
     '''Wrapper for SVG g element. Parameters:
@@ -862,9 +854,8 @@ class CanvasObject(svg.svg):
         if isinstance(svgobject, GroupObject):
             for obj in svgobject.objectList:
                 self.translateObject(obj, offset)
-            if hasattr(svgobject, "pointList"):
-                self.translateObject(svgobject.boundary, offset)
-                svgobject.update()
+            boundary = getattr(svgobject, "boundary", None)
+            if boundary: self.translateObject(boundary, offset)
         elif isinstance(svgobject, PointObject):
             svgobject.XY += offset
         else:
