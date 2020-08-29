@@ -232,7 +232,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
     @pointList.setter
     def pointList(self, pointlist):
-        self._pointList = pointlist
+        self._pointList = [Point(coords) for coords in pointlist]
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
 
     def cloneObject(self):
@@ -584,7 +584,7 @@ class Button(GroupObject):
         self.button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
         self.button.attrs["rx"] = height/3
         rowcount = text.count("\n") + 1
-        if not fontsize: fontsize = height*0.8/rowcount
+        if not fontsize: fontsize = height*0.75/rowcount
         text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
         self.addObjects([self.button, text])
         self.fixed = True
@@ -864,6 +864,7 @@ class CanvasObject(svg.svg):
                 svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
             svgobject.update()
             svgobject.updatehittarget()
+            if isinstance(svgobject, PolygonObject): svgobject._segments = None
 
     #The methods below are not intended to be called by end-users.
     @property

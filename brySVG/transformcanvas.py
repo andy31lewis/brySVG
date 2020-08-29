@@ -133,9 +133,9 @@ class TransformMixin(object):
         self.matrixTransform(matrix)
         if angle != 0: self.rotate(angle)
 
-    def enlarge(self, scalefactor, centre):
+    def enlarge(self, scalefactor, centre=(0,0)):
         '''Enlarge object by scale factor scalefactor, from centre.
-        If cx and cy are not given, the centre is the origin.'''
+        If centre is not given, the centre is the origin.'''
         (cx, cy) = centre
         matrix = svgbase.createSVGMatrix()
         matrix = matrix.translate(cx, cy)
