@@ -122,6 +122,11 @@ class PolygonMixin(object):
         '''Returns the area of the PolygonObject'''
         return _area(self.pointList)
 
+    def getBoundingBox(self):
+        '''Returns bounding box based strictly on coords.
+        And can be used before polygon is on the canvas (unlike built-in getBBox).'''
+        return _getboundingbox(self.pointList)
+
     def isEqual(self, other):
         '''Returns True if poly1 is identical to poly2, False otherwise.'''
         return _equalpolygons(self.pointList, other.pointList)
@@ -413,33 +418,23 @@ class PolygonCanvasMixin(object):
         if bestangle is not None: #First snap the edges together
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
             if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
-            if not self.vertexSnap: return #Then if required, try to snap the vertices
-            objpoints = [svgobject.pointList[objseg.leftindex], svgobject.pointList[objseg.rightindex]]
-            checkpoints = [checkseg.leftpoint, checkseg.rightpoint]
-            pointpairs = [(p1, p2) for p1 in objpoints for p2 in checkpoints]
-            for (point1, point2) in pointpairs:
-                (dx, dy) = point2 - point1
-                if abs(dx) < snapd and abs(dy) < snapd:
-                    #print(f"Snap {point1} to {point2}")
-                    svgobject.translate((dx, dy))
-                    break
-        elif self.vertexSnap: #Even if we can't snap the edges, can still try to snap the vertices
+        if self.vertexSnap: #Even if we can't snap the edges, can still try to snap the vertices
             self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
         print("ES-dosnap", time.time()-tt)
 
-def _compareboundingboxes(poly1, poly2, xdp=None, ydp=None):
-    def getboundingbox(poly):
-        xcoords = [round(x, xdp) for (x,y) in poly] if xdp else [x for (x,y) in poly]
-        left = min(xcoords)
-        right = max(xcoords)
-        ycoords = [round(y, ydp) for (x,y) in poly] if ydp else [y for (x,y) in poly]
-        top = min(ycoords)
-        bottom = max(ycoords)
-        return (left, top), (right, bottom)
+def _getboundingbox(poly, xdp=None, ydp=None):
+    xcoords = [round(x, xdp) for (x,y) in poly] if xdp else [x for (x,y) in poly]
+    left = min(xcoords)
+    right = max(xcoords)
+    ycoords = [round(y, ydp) for (x,y) in poly] if ydp else [y for (x,y) in poly]
+    top = min(ycoords)
+    bottom = max(ycoords)
+    return (left, top), (right, bottom)
 
+def _compareboundingboxes(poly1, poly2, xdp=None, ydp=None):
     if xdp and not ydp: ydp = xdp
-    ((left1, top1), (right1, bottom1)) = getboundingbox(poly1)
-    ((left2, top2), (right2, bottom2)) = getboundingbox(poly2)
+    ((left1, top1), (right1, bottom1)) = _getboundingbox(poly1, xdp, ydp)
+    ((left2, top2), (right2, bottom2)) = _getboundingbox(poly2, xdp, ydp)
     if right1 < left2 or right2 < left1 or bottom1 < top2 or bottom2 < top1: return Position.DISJOINT
     if right1 == left2 or right2 == left1 or bottom1 == top2 or bottom2 == top1: return Position.TOUCHING
     if left1 < left2:
