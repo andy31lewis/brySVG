@@ -480,7 +480,7 @@ def _getrotatedcoords(polylist, xdp):
         anglesfromvertical = []
         for poly in polylist:
             segs = poly.segments
-            anglesfromvertical.extend([abs(seg.angle) for seg in segs])
+            anglesfromvertical.extend([round(abs(seg.angle), 3) for seg in segs])
         #print("angles", [a*180/pi for a in anglesfromvertical])
         if 0 not in anglesfromvertical: return 0
         positiveangles = [a for a in anglesfromvertical if a>0.1]
@@ -491,7 +491,7 @@ def _getrotatedcoords(polylist, xdp):
     #print("Best angle", a*180/pi)
     coordslists = []
     for poly in polylist:
-        #print(f"Before rounding:{poly.pointList}")
+        #print(f"{poly} Before rounding:{poly.pointList}")
         if a == 0:
             polyrotated = poly.pointList
         else:
@@ -508,7 +508,7 @@ def _getrotatedcoords(polylist, xdp):
 
         coords = [(round(x, xdp), y) for (x, y) in polyrotated]
         coordslists.append(coords)
-        #print(f"After rotation and rounding:\n{coords}")
+        #print(f"{poly} after rotation and rounding:\n{coords}")
     return coordslists
 
 def _getsortedsegments(polylist, coordslists):
@@ -543,7 +543,7 @@ def relativeposition(self, other):
     '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
     other is another PolygonObject.'''
     def sweeppast(x, latestoutcome, livesegments):
-        #print("\nXvalue", x, "\nLive segments:\n", "\n".join(str(seg) for seg in livesegments), "\nCurrent Outcome", latestoutcome)
+        #print("\n\nXvalue", x, "\nLive segments:\n", "\n".join(str(seg) for seg in livesegments), "\nCurrent Outcome", latestoutcome)
         for seg in livesegments:
             if seg.rightx == x:
                 seg.y = round(seg.righty, dp2)
@@ -552,25 +552,26 @@ def relativeposition(self, other):
 
         for i, seg in enumerate(livesegments):
             for seg2 in livesegments[i+1:]:
-                #print("Comparing", seg, "with", seg2)
+                #print("\nComparing\n", seg, "\nwith\n", seg2)
                 if seg.y == inf or seg2.y == inf: continue
                 if seg.y > seg2.y and seg.poly != seg2.poly:
                     #print("Found Intersection:", seg, seg.y, seg2, seg2.y)
                     return Position.OVERLAPS, None
-        livesegments = [seg for seg in livesegments if seg.rightx > x]
+        livesegments = [seg for seg in livesegments if round(seg.rightx, dp1) > round(x, dp1)]
 
-        while unusedsegments and unusedsegments[0].leftx == x:
+        while unusedsegments and round(unusedsegments[0].leftx, dp1) == round(x, dp1):
             newseg = unusedsegments.pop(0)
             newseg.y = round(newseg.lefty, dp2)
             livesegments.append(newseg)
         livesegments.sort(key=lambda seg: (seg.y, seg.gradient))
-        #print("Updated live segments:\n", "\n".join(str(seg) for seg in livesegments))
+        #print("\nUpdated live segments:\n", "\n".join(str(seg) for seg in livesegments))
 
         yvaluesA = [seg.y for seg in livesegments if seg.poly == polyA]
         intervalsA = list(zip(yvaluesA[::2], yvaluesA[1::2]))
         yvaluesB = [seg.y for seg in livesegments if seg.poly == polyB]
         intervalsB = list(zip(yvaluesB[::2], yvaluesB[1::2]))
 
+        #print("\nIntervals A", intervalsA, "\nIntervalsB", intervalsB)
         for (startB, endB) in intervalsB: #For each "inner?" interval
             for (startA, endA) in intervalsA: #Check each "outer?" interval
                 if startB == endB and (startA == startB or endA == endB): break
@@ -606,8 +607,7 @@ def relativeposition(self, other):
     #print("Transposed", transposed)
     unusedsegments = _getsortedsegments([polyA, polyB], [coordslist1, coordslist2])
     #print("segments", time.time()-tt)
-    #print("\nSegments at start:")
-    #for seg in unusedsegments: print(seg)
+    #print("\nSegments at start:\n", "\n".join(str(seg) for seg in unusedsegments))
     livesegments = []
     currentoutcome = None
     xvalues = sorted(set(x for (x, y) in coordslist1+coordslist2))
@@ -666,8 +666,7 @@ def findintersections(polylist):
                 seg.xpos = "M"
                 seg.currentindex = seg.index
         #print("\nXvalue", x)
-        #print("\nLive segments (start of sweeppast):")
-        #for seg in livesegments: print(seg)
+        #print("\nLive segments (start of sweeppast):\n", "\n".join(str(seg) for seg in livesegments))
 
         for i, seg in enumerate(livesegments): #for each live segment,
             for seg2 in livesegments[i+1:]: #look at all segments whose y-coord was previously >= this segment's y-coord
@@ -689,8 +688,7 @@ def findintersections(polylist):
 
         livesegments.sort(key=lambda seg: seg.y) #sort live segments based on y-coord (but not gradient; may be about to cross)
         livesegments = mergelists(livesegments, newsegments) #merge the new segments based on y-coord and gradient
-        #print("\nLive segments (with new added):")
-        #for seg in livesegments: print(seg)
+        #print("\nLive segments (with new added):\n", "\n".join(str(seg) for seg in livesegments))
 
         segiter = iter(livesegments)
         seg = next(segiter, None)
@@ -717,9 +715,7 @@ def findintersections(polylist):
 
     unusedsegments = _getsortedsegments(polylist, coordslists)
     #print("FI-getsortedsegments", time.time()-tt)
-
-    #print("\nSegments at start:")
-    #for seg in unusedsegments: print(seg)
+    #print("\nSegments at start:\n", "\n".join(str(seg) for seg in unusedsegments))
     ixpoints = {}
     livesegments = []
     xvalues = sorted(set(x for coordslist in coordslists for (x, y) in coordslist))
