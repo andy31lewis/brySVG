@@ -177,7 +177,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
                 self.boundary = newboundary
 
         super().addObject(svgobject, objid)
-        self.update()
+        #self.update()
         return True
 
     def addObjects(self, polylist, listboundary=None):
@@ -195,7 +195,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
         else:
             self.boundary = newboundary
         super().addObjects(polylist)
-        self.update()
+        #self.update()
         return True
 
     def removeObject(self, svgobject):
@@ -210,12 +210,12 @@ class PolygonGroup(GroupObject, PolygonMixin):
         else:
             self.boundary = newboundary
         super().removeObject(svgobject)
-        self.update()
+        #self.update()
         return True
 
     def deleteAll(self):
         self.boundary = None
-        self.update()
+        #self.update()
         super().deleteAll()
 
     @property
@@ -259,7 +259,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
     def cloneObject(self):
         newobject = super().cloneObject()
         newobject.boundary = self.boundary.cloneObject()
-        newobject.update()
+        #newobject.update()
         return newobject
 
 class PolygonCanvasMixin(object):
@@ -285,7 +285,7 @@ class PolygonCanvasMixin(object):
             checksegs.extend(obj.segments)
             checkobjs.append(obj)
         if not checksegs:
-            print("ES-disjoint", time.time()-tt)
+            #print("ES-disjoint", time.time()-tt)
             return
         checksegs.sort(key = lambda seg: seg.angle) #all segments which could possibly be snapped to, sorted by angle from vertical
         for seg in checksegs: #if any segments have an angle within snapangle of -pi/2, create a copy with equaivalent angle close to +pi/2
@@ -420,7 +420,7 @@ class PolygonCanvasMixin(object):
             if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
         if self.vertexSnap: #Even if we can't snap the edges, can still try to snap the vertices
             self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
-        print("ES-dosnap", time.time()-tt)
+        #print("ES-dosnap", time.time()-tt)
 
 def _getboundingbox(poly, xdp=None, ydp=None):
     xcoords = [round(x, xdp) for (x,y) in poly] if xdp else [x for (x,y) in poly]

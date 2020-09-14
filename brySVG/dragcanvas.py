@@ -25,7 +25,7 @@ class Enum(list):
             setattr(self, value, i)
             self.append(i)
 
-MouseMode = Enum('MouseMode', 'NONE DRAG TRANSFORM DRAW EDIT')
+MouseMode = Enum('MouseMode', 'NONE DRAG TRANSFORM DRAW EDIT PAN')
 TransformType = Enum('TransformType', 'NONE TRANSLATE ROTATE XSTRETCH YSTRETCH ENLARGE')
 Position = Enum ('Position', 'CONTAINS INSIDE OVERLAPS EQUAL DISJOINT')
 
@@ -213,7 +213,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
 
     def update(self):
-        pass
+        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self._pointList])
 
     def __repr__(self):
         return f"polygon {self.id}" if self.id else f"polygon {id(self)}"
@@ -233,7 +233,7 @@ class PolygonObject(svg.polygon, ObjectMixin):
     @pointList.setter
     def pointList(self, pointlist):
         self._pointList = [Point(coords) for coords in pointlist]
-        self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
+        self.update()
 
     def cloneObject(self):
         newobject = self.__class__()
@@ -689,6 +689,7 @@ class CanvasObject(svg.svg):
         self.fillColour  = "yellow"
         self.penWidth = 3
         self.lineWidthScaling = True
+        self.panning = False
 
         #Attributes intended to be read-only for users
         self.scaleFactor = 1 #Multiply by this to convert CSS pixels to SVG units
@@ -725,6 +726,8 @@ class CanvasObject(svg.svg):
         Returns the SVG coords of the top-left and bottom right of the canvas.'''
         ((x1, y1), (x2, y2)) = pointlist
         self.attrs["viewBox"] = f"{x1} {y1} {x2-x1} {y2-y1}"
+        self.viewBoxRect = [Point((x1, y1)), Point((x2, y2))]
+        self.centre = Point(((x1+x2)/2, (y1+y2)/2))
         self.scaleFactor = self.getScaleFactor()
         bcr = self.getBoundingClientRect()
         pt = self.createSVGPoint()
@@ -948,9 +951,14 @@ class CanvasObject(svg.svg):
             self.drawPoint(event)
         elif self.mouseMode == MouseMode.EDIT:
             self.prepareEdit(event)
+        elif self.mouseMode == MouseMode.PAN:
+            self.preparePan(event)
 
     def onMouseMove(self, event):
         event.preventDefault()
+        if self.mouseMode == MouseMode.PAN:
+            if self.panning: self.doPan(event)
+            return
         if not self.mouseOwner: return
         if self.mouseMode == MouseMode.DRAG:
             self.doDrag(event)
@@ -959,6 +967,9 @@ class CanvasObject(svg.svg):
 
     def onLeftUp(self, event):
         if event.type == "mouseup" and event.button > 0: return
+        if self.mouseMode == MouseMode.PAN:
+            self.endPan(event)
+            return
         if not self.mouseOwner: return
         if self.mouseMode == MouseMode.DRAG:
             self.endDrag(event)
@@ -999,6 +1010,26 @@ class CanvasObject(svg.svg):
         if self.edgeSnap: self.doEdgeSnap(self.mouseOwner)
         elif self.vertexSnap: self.doVertexSnap(self.mouseOwner)
         self.mouseOwner = None
+
+    def preparePan(self, event):
+        x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+        y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+        self.startPoint = Point((x, y))
+        self.startCentre = self.centre
+        self.panStart = self.viewBoxRect
+        self.panning = True
+
+    def doPan(self, event):
+        x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+        y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+        delta = (Point((x, y)) - self.startPoint)*self.scaleFactor
+        #self.centre = self.startCentre - delta
+        newviewbox = [point-delta for point in self.panStart]
+        self.setViewBox(newviewbox)
+
+    def endPan(self, event):
+        self.panning = False
+        print(f"pan: new centre {self.centre}, new viewbox {self.viewBoxRect}")
 
     def getSelectedObject(self, objectid, getGroup = True):
         try:
