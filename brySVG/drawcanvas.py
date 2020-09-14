@@ -17,10 +17,12 @@ class NonBezierMixin(object):
     def setPoint(self, i, point):
         self.pointList[i] = point
         self.update()
+        self.updatehittarget()
 
     def setPoints(self, pointlist):
         self.pointList = pointlist
         self.update()
+        self.updatehittarget()
 
     def movePoint(self, coords):
        self.setPoint(-1, coords)
@@ -50,6 +52,7 @@ class BezierMixin(object):
         self.pointList[i] = pointset[1]
         self.pointsetList[i] = pointset
         self.update()
+        self.updatehittarget()
 
     def setPointsets(self, pointsetlist):
         self.pointList = [pointset[1] for pointset in pointsetlist]
@@ -61,11 +64,13 @@ class BezierMixin(object):
         self.pointList[i] = point
         self.pointsetList = self.getpointsetlist(self.pointList)
         self.update()
+        self.updatehittarget()
 
     def setPoints(self, pointlist):
         self.pointList = pointlist
         self.pointsetList = self.getpointsetlist(pointlist)
         self.update()
+        self.updatehittarget()
 
     def appendPoint(self, point):
         self.pointList.append(point)
@@ -152,11 +157,12 @@ class DrawCanvasMixin(object):
             coords = self.getSVGcoords(event)
             self.createObject(coords)
 
-    def endDraw(self, event):
+    def endDraw(self, event=None):
         if not self.mouseOwner: return
         svgobj = self.mouseOwner
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
-            if event.type == "dblclick":
+            evtype = getattr(event, "type", None)
+            if evtype == "dblclick":
                 svgobj.deletePoints(-2, None)
                 #print("Deleted last 2 points")
             elif self.mouseDetected:
@@ -177,6 +183,7 @@ class DrawCanvasMixin(object):
     def createEditHitTargets(self):
         objlist = list(self.objectDict.values())
         for obj in objlist:
+            if isinstance(obj, GroupObject): continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
             if obj.fixed: continue
