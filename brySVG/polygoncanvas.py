@@ -128,7 +128,7 @@ class PolygonMixin(object):
         return _getboundingbox(self.pointList)
 
     def isEqual(self, other):
-        '''Returns True if poly1 is identical to poly2, False otherwise.'''
+        '''Returns True if the polygon is identical to other, False otherwise.'''
         return _equalpolygons(self.pointList, other.pointList)
 
     def positionRelativeTo(self, other):
@@ -137,7 +137,8 @@ class PolygonMixin(object):
         return relativeposition(self, other)
 
     def getIntersections(self, other):
-        '''Returns a list of Intersection objects. Each Intersection has 3 attributes:
+        '''Returns a list of the intersections between the polygon and other.
+        Each intersection is represented by an Intersection object which has 3 attributes:
         .point: a Point whose coordinates are the intersection
         .selfindex: if this is an integer i, the intersection is at a vertex of self, namely self.pointList[i]
                     if this is a tuple (i-1, i), the intersection is between self.pointList[i-1] and self.pointList[i]
@@ -150,6 +151,8 @@ class PolygonMixin(object):
         return ixlist
 
     def merge(self, other):
+        '''If self and other touch or overlap, this returns a PolygonObject which is the outer boundary of self and other.
+        Otherwise returns None.'''
         return boundary([self, other])
 
 class PolygonGroup(GroupObject, PolygonMixin):
@@ -263,6 +266,10 @@ class PolygonGroup(GroupObject, PolygonMixin):
         return newobject
 
 class PolygonCanvasMixin(object):
+    '''This adds canvas.edgeSnap and canvas.snapAngle (for PolygonObjects and PolygonGroups only):
+    If edgeSnap is set to True, then after a drag or rotate, if an edge of the moved object is within snapAngle degrees
+    (default is 10) and snapDistance SVG units (default 10) of an edge of another object in the canvas's objectDict,
+    the moved object is snapped so that the edges coincide.'''
     def doEdgeSnap(self, svgobject):
         tt = time.time()
         if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return
@@ -622,8 +629,13 @@ def relativeposition(self, other):
     return currentoutcome
 
 def findintersections(polylist):
-    '''Returns an Enum value: Position.CONTAINS, Position.INSIDE, Position.OVERLAPS, Position.DISJOINT or Position.EQUAL.
-    other is another PolygonObject.'''
+    '''Returns a list of all the intersections between polygons in polylist.
+    Each intersection is represented by an Intersection object which has 2 attributes:
+    .point: a Point whose coordinates are the intersection
+    .polyrefs: a dictionary whose keys are the polygons which intersect at the that point.  For each key, the value is the index.
+    If this is an integer i, the intersection is at key.pointList[i]
+    If this is a tuple (i-1, i), the intersection is between key.pointList[i-1] and key.pointList[i]
+    '''
     def calculatepoint(polyrefs):
         (poly1, index1), (poly2, index2) = polyrefs
         (i1a, i1b), (i2a, i2b) = index1, index2
@@ -727,6 +739,8 @@ def findintersections(polylist):
     return list(ixpoints.values())
 
 def boundary(polylist):
+    '''If all the PolygonObjects in the polylist touch or overlap, this returns a PolygonObject which is their outer boundary.
+    Otherwise returns None.'''
     tt = time.time()
     polylist = [getattr(poly, "boundary", poly) for poly in polylist]
     ixlist = findintersections(polylist)

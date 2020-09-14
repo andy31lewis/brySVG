@@ -60,12 +60,14 @@ class ObjectMixin(object):
         return newobject
 
     def setStyle(self, attribute, value):
+        '''Utility function, can be overridden for specific types of object'''
         self.style = {attribute:value}
 
     def __repr__(self):
         return f"{self.__class__}{self.id}"
 
     def updatehittarget(self):
+        '''Not intended to be called by end users.'''
         hittarget = getattr(self, "hitTarget", None)
         if hittarget:
             hittarget.pointList = self.pointList
@@ -640,6 +642,9 @@ class CanvasObject(svg.svg):
     Objects are stored in canvas.objectDict using their id as the dictionary key. (if not supplied, ids are made up.)
     After creation, there are various attributes which control how the canvas responds to mouse actions:
 
+    canvas.mouseMode = MouseMode.PAN
+        Dragging the canvas pans the viewport.
+
     canvas.mouseMode = MouseMode.DRAG
         Objects can be dragged around on the canvas.
         canvas.vertexSnap and canvas.snapDistance: If vertexSnap is set to True, then after a drag, if a vertex of the
@@ -648,7 +653,7 @@ class CanvasObject(svg.svg):
         (If more than one pair of vertices are below the snap threshold, the closest pair are used.)
 
     canvas.mouseMode = MouseMode.TRANSFORM
-        ***To enable this mode, use import transformcanvas or import fullcanvas instead of import dragcanvas***
+        ***To enable this mode, use import transformcanvas, import polygoncanvas or import fullcanvas instead of import dragcanvas***
         Objects can be dragged around on the canvas.  In addition, clicking on an object shows a bounding box
         and a number of handles (which ones can be controlled by setting canvas.transformTypes to the list of transforms
         required. By default, canvas.transformTypes includes:
@@ -688,8 +693,7 @@ class CanvasObject(svg.svg):
         self.penColour = "black"
         self.fillColour  = "yellow"
         self.penWidth = 3
-        self.lineWidthScaling = True
-        self.panning = False
+        self.lineWidthScaling = True #If False, line thicknesses do not change when zooming in
 
         #Attributes intended to be read-only for users
         self.scaleFactor = 1 #Multiply by this to convert CSS pixels to SVG units
@@ -698,6 +702,7 @@ class CanvasObject(svg.svg):
         self.selectedObject = None #The shape which was last clicked on or dragged
 
         #Attributes not intended to be used by end-users
+        self.panning = False
         self.nextid = 0
         self.objectDict = {}
         self.hittargets = []
@@ -723,7 +728,9 @@ class CanvasObject(svg.svg):
 
     def setViewBox(self, pointlist):
         '''Should be done after the canvas has been added to the page.
-        Returns the SVG coords of the top-left and bottom right of the canvas.'''
+        pointlist is the coordinates of the desired top-left and bottom-right of the canvas
+        Returns the SVG coords of the actual top-left and bottom right of the canvas
+        (which will usually be different dues to the need to preserve the aspect ratio).'''
         ((x1, y1), (x2, y2)) = pointlist
         self.attrs["viewBox"] = f"{x1} {y1} {x2-x1} {y2-y1}"
         self.viewBoxRect = [Point((x1, y1)), Point((x2, y2))]
@@ -757,8 +764,8 @@ class CanvasObject(svg.svg):
         return rectpointlist
 
     def getScaleFactor(self):
-        '''Recalculates self.scaleFactor. This is called automatically by fitContents(), but should be called manually
-         after zooming in or out of the canvas in some other way.'''
+        '''Recalculates self.scaleFactor. This is called automatically by setViewBox or fitContents(),
+        but should be called manually after zooming in or out of the canvas in some other way.'''
         width, height = self.setDimensions()
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
         return max(vbwidth/width, vbheight/height)
@@ -775,6 +782,7 @@ class CanvasObject(svg.svg):
     def addObject(self, svgobject, objid=None, fixed=fixeddefault):
         '''Adds an object to the canvas, and also adds it to the canvas's objectDict so that it can be referenced
         using canvas.objectDict[id]. This is also needed for the object to be capable of being snapped to.
+        If the object should not be capable of being dragged or transformed with mouse actions, set `fixed` to True.
         (Note that referencing using document[id] will only give the SVG element, not the Python object.)
         If it is not desired that an object should be in the objectDict, just add it to the canvas using Brython's <= method.'''
         def AddToDict(svgobj):
