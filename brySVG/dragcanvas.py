@@ -678,8 +678,10 @@ class CanvasObject(svg.svg):
         No user interaction with the canvas.
     '''
 
-    def __init__(self, width, height, colour="white", objid=None):
-        svg.svg.__init__(self, style={"width":width, "height":height, "backgroundColor":colour})
+    def __init__(self, width=None, height=None, colour="white", objid=None):
+        svg.svg.__init__(self, style={"backgroundColor":colour})
+        if width: self.style.width = width
+        if height: self.style.height = height
         self.id = objid if objid else f"canvas{id(self)}"
         self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
