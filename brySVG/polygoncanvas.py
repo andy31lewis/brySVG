@@ -190,7 +190,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
             blist.append(listboundary)
         else:
             blist.extend(polylist)
-        newboundary = listboundary if len(blist) == 1 else boundary(blist)
+        newboundary = blist[0] if len(blist) == 1 else boundary(blist)
         if newboundary is False:
             return False
         elif newboundary is None:
