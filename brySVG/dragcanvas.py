@@ -591,11 +591,15 @@ class Button(GroupObject):
         self.addObjects([self.button, text])
         self.fixed = True
         self.bind("mousedown", self.onMouseDown)
+        self.bind("mouseup", self.onMouseUp)
         self.bind("click", onclick)
         self.bind("touchstart", onclick)
         self.attrs["cursor"] = "pointer"
 
     def onMouseDown(self, event):
+        event.stopPropagation()
+
+    def onMouseUp(self, event):
         event.stopPropagation()
 
     def setBackgroundColour(self, colour):
@@ -1056,7 +1060,6 @@ class CanvasObject(svg.svg):
         return svgobj
 
     def doVertexSnap(self, svgobject, checkpoints=None):
-        tt = time.time()
         if not hasattr(svgobject, "pointList"): return
         snapd = self.snapDistance
         bestdx = bestdy = bestd = None
@@ -1069,6 +1072,7 @@ class CanvasObject(svg.svg):
                 if objid == svgobject.id: continue
                 obj = self.objectDict[objid]
                 if not hasattr(obj, "pointList"): continue
+                if obj.style.visibility == "hidden": continue
                 if objgroup := getattr(obj, "group", None) and hasattr(objgroup, "pointList") : continue
                 bbox = obj.getBBox()
                 L1, R1, T1, B1 = bbox.x, bbox.x+bbox.width, bbox.y, bbox.y+bbox.height
@@ -1095,6 +1099,7 @@ class CanvasObject(svg.svg):
                 if tonextx - dx > snapd: checkstart += 1 #point just checked will be too far to the left when sweepline moves on
                 if dx > snapd: break #point just checked is too far to the right of sweepline - time to move sweepline on
         if bestd: self.translateObject(svgobject, (bestdx, bestdy))
+        #print("Done vertexSnap", time.time()-tt)
 
 class Point(object):
     '''Class to represent coordinates and also give some vector functionality'''

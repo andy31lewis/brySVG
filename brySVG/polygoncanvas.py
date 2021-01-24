@@ -127,6 +127,10 @@ class PolygonMixin(object):
         And can be used before polygon is on the canvas (unlike built-in getBBox).'''
         return _getboundingbox(self.pointList)
 
+    def getCentre(self):
+        (left, top), (right, bottom) = _getboundingbox(self.pointList)
+        return ((left+right)/2, (top+bottom)/2)
+
     def isEqual(self, other):
         '''Returns True if the polygon is identical to other, False otherwise.'''
         return _equalpolygons(self.pointList, other.pointList)
@@ -595,6 +599,7 @@ def relativeposition(self, other):
 
     polyA, polyB = getattr(self, "boundary", self), getattr(other, "boundary", other)
     coordslist1, coordslist2 = _getrotatedcoords([polyA, polyB], xdp=dp)
+    #print("Coords1",coordslist1,"\nCoords2",coordslist2)
 
     transposed = False
     bboxresult = _compareboundingboxes(coordslist1, coordslist2, ydp=dp)
