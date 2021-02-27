@@ -329,6 +329,29 @@ class CircleObject(svg.circle, ObjectMixin):
         self.attrs["cy"]=y1
         self.attrs["r"]=hypot(x2-x1, y2-y1)
 
+class UseObject(svg.use, ObjectMixin):
+    '''Wrapper for SVG use.  Parameters:
+    topleft: coordinates of the top left point of the shape's bounding box
+    angle: an optional angle of rotation (clockwise, in degrees).'''
+    def __init__(self, href, topleft=(0,0), angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+        svg.use.__init__(self, href=href)
+        self.pointList = [Point(topleft), Point(topleft)]
+        self.angle = angle
+        self.update()
+
+    def update(self):
+        [(x1, y1), (x2, y2)] = self.pointList
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.transform.baseVal.initialize(t)
+        self.rotatestring = self.attrs["transform"]
+
+        basepointlist = self.transformedpointlist(t.matrix.inverse())
+        [(x1, y1), (x2, y2)] = basepointlist
+        self.attrs["x"] = x2 if x2<x1 else x1
+        self.attrs["y"] = y2 if y2<y1 else y1
+
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be straight lines)
@@ -579,7 +602,7 @@ class GroupObject(svg.g, ObjectMixin):
 class Button(GroupObject):
     '''A clickable button with (multiline) text on it. If fontsize is not specified, the text will be scaled to fit
     the height (but not width) of the button. The onclick parameter is the function which handles the event.'''
-    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="lightgrey", objid=None):
+    def __init__(self, position, size, text, onclick, fontsize=None, fillcolour="lightgrey", canvas=None, objid=None):
         GroupObject.__init__(self)
         if objid: self.id = objid
         (x, y), (width, height) = position, size
@@ -587,8 +610,8 @@ class Button(GroupObject):
         self.button.attrs["rx"] = height/3
         rowcount = text.count("\n") + 1
         if not fontsize: fontsize = height*0.75/rowcount
-        text = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
-        self.addObjects([self.button, text])
+        self.label = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
+        self.addObjects([self.button, self.label])
         self.fixed = True
         self.bind("mousedown", self.onMouseDown)
         self.bind("mouseup", self.onMouseUp)
@@ -609,7 +632,7 @@ class ImageButton(GroupObject):
     '''A clickable button with an SVG image on it. The centre of the image should be at (0,0).
     If the canvas is specified, the image will be scaled to fit inside the button.
     The onclick parameter is the function which handles the event.'''
-    def __init__(self, position, size, image, onclick, fillcolour="lightgrey", canvas=None, objid=None):
+    def __init__(self, position, size, image, onclick, fontsize=None, fillcolour="lightgrey", canvas=None, objid=None):
         GroupObject.__init__(self)
         if objid: self.id = objid
         (x, y), (width, height) = position, size
@@ -1013,7 +1036,7 @@ class CanvasObject(svg.svg):
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         dx, dy = (x-self.startx)*self.scaleFactor, (y-self.starty)*self.scaleFactor
         self.mouseOwner.attrs["transform"] = "translate({},{})".format(dx, dy)
-        if isinstance(self.mouseOwner, [EllipseObject, RectangleObject]):
+        if isinstance(self.mouseOwner, [EllipseObject, RectangleObject, UseObject]):
             self.mouseOwner.attrs["transform"] += self.mouseOwner.rotatestring
 
     def endDrag(self, event):
