@@ -339,25 +339,27 @@ class UseObject(svg.use, ObjectMixin):
     '''Wrapper for SVG use.  Parameters:
     topleft: coordinates of the top left point of the shape's bounding box
     angle: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, href, origin=(0,0), width=None, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
+    def __init__(self, href, origin=(0,0), angle=0, objid=None):
         svg.use.__init__(self, href=href)
-        self.pointList = [Point(origin), Point(origin)]
+        (self.attrs["x"], self.attrs["y"]) = origin
+        self.origin = Point(origin)
         self.angle = angle
-        self.update()
         if objid: self.id = objid
 
-    def update(self):
+    def getPointList(self):
+        bbox = self.getBBox()
+        self.pointList = [(bbox.x, bbox.y), (bbox.x+bbox.width, bbox.y+bbox.height)]
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
-        self.transform.baseVal.initialize(t)
-        self.rotatestring = self.attrs["transform"]
+        self.pointList = self.transformedpointlist(t.matrix)
 
-        basepointlist = self.transformedpointlist(t.matrix.inverse())
-        [(x1, y1), (x2, y2)] = basepointlist
-        self.attrs["x"] = x2 if x2<x1 else x1
-        self.attrs["y"] = y2 if y2<y1 else y1
+    def update(self):
+        (self.attrs["x"], self.attrs["y"]) = self.origin
+        [(x1, y1), (x2, y2)] = self.pointList
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        self.rotatestring = self.attrs["transform"] = f"rotate({self.angle}, {cx}, {cy})"
 
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
@@ -730,7 +732,7 @@ class CanvasObject(svg.svg):
         self.id = objid if id else f"canvas{id(self)}"
         self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
-        self.mouseMode = MouseMode.DRAG
+        self.mouseMode = MouseMode.NONE
         self.transformTypes = TransformType
         self.vertexSnap = False
         self.snapDistance = 10
@@ -847,6 +849,9 @@ class CanvasObject(svg.svg):
         self <= svgobject
         AddToDict(svgobject)
         svgobject.canvas = self
+        if isinstance(svgobject, UseObject):
+            svgobject.getPointList()
+            svgobject.update()
         return svgobject
 
     def deleteObject(self, svgobject):
@@ -920,6 +925,8 @@ class CanvasObject(svg.svg):
             svgobject.pointList = [point+offset for point in svgobject.pointList]
             if isinstance(svgobject, BezierObject):
                 svgobject.pointsetList = [(p1+offset,p2+offset,p3+offset) for (p1,p2,p3) in svgobject.pointsetList]
+            if isinstance(svgobject, UseObject):
+                svgobject.origin += offset
             svgobject.update()
             svgobject.updatehittarget()
             if isinstance(svgobject, PolygonObject): svgobject._segments = None
@@ -961,8 +968,12 @@ class CanvasObject(svg.svg):
             if isinstance(obj, GroupObject): continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
-            if obj.style.fill != "none" or obj.fixed: continue
-            newobj = obj.cloneObject()
+            if isinstance(obj, UseObject):
+                newobj = RectangleObject(obj.pointList, obj.angle)
+            elif obj.style.fill != "none" or obj.fixed:
+                continue
+            else:
+                newobj = obj.cloneObject()
             newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
             newobj.style.opacity = 0
             newobj.reference = obj
