@@ -669,6 +669,13 @@ class ImageButton(GroupObject):
     def setBackgroundColour(self, colour):
         self.button.style.fill = colour
 
+class Definitions(svg.defs):
+    def __init__(self, objlist=[], filename=None):
+        svg.defs.__init__(self)
+        if filename:
+            self.innerHTML = open(filename).read()
+        for obj in objlist: self <= obj
+
 class CanvasObject(svg.svg):
     '''Wrapper for SVG svg element.  Parameters:
     width, height: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc.
