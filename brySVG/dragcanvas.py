@@ -104,7 +104,7 @@ class SmoothBezierMixin(object):
 
 class LineObject(svg.line, ObjectMixin):
     '''A wrapper for SVG line.'''
-    def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none"):
+    def __init__(self, pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none", objid=None):
         [(x1, y1), (x2, y2)] = pointlist
 
         if style == "faintdash1":
@@ -118,6 +118,7 @@ class LineObject(svg.line, ObjectMixin):
 
         svg.line.__init__(self, x1=x1, y1=y1, x2=x2, y2=y2, style={"stroke":linecolour, "strokeDasharray":dasharray, "stroke-width":linewidth})
         self.pointList = [Point(coords) for coords in pointlist]
+        if objid: self.id = objid
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
@@ -199,10 +200,11 @@ class WrappingTextObject(svg.text):
 class PolylineObject(svg.polyline, ObjectMixin):
     '''Wrapper for SVG polyline. Parameter:
     pointlist: a list of coordinates for the vertices'''
-    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none"):
+    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="none", objid=None):
         svg.polyline.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.update()
+        if objid: self.id = objid
 
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self.pointList])
@@ -210,9 +212,10 @@ class PolylineObject(svg.polyline, ObjectMixin):
 class PolygonObject(svg.polygon, ObjectMixin):
     '''Wrapper for SVG polygon. Parameter:
     pointlist: a list of coordinates for the vertices'''
-    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, pointlist=[(0,0)], linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.polygon.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in pointlist])
+        if objid: self.id = objid
 
     def update(self):
         self.attrs["points"] = " ".join([str(point[0])+","+str(point[1]) for point in self._pointList])
@@ -264,11 +267,12 @@ class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
     pointlist: a list of coordinates for two opposite vertices
     angle: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.rect.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.angle = angle
         self.update()
+        if objid: self.id = objid
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
@@ -289,11 +293,12 @@ class EllipseObject(svg.ellipse, ObjectMixin):
     '''Wrapper for SVG ellipse.  Parameters:
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
     and an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.ellipse.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.pointList = [Point(coords) for coords in pointlist]
         self.angle = angle
         self.update()
+        if objid: self.id = objid
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
@@ -314,7 +319,7 @@ class CircleObject(svg.circle, ObjectMixin):
     '''Wrapper for SVG circle. Parameters:
     EITHER  centre and radius,
     OR pointlist: a list of two points: the centre, and any point on the circumference.'''
-    def __init__(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         if pointlist:
             self.pointList = [Point(coords) for coords in pointlist]
         else:
@@ -322,6 +327,7 @@ class CircleObject(svg.circle, ObjectMixin):
             self.pointList = [Point((x, y)), Point((x+radius, y))]
         svg.circle.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.update()
+        if objid: self.id = objid
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
@@ -333,11 +339,12 @@ class UseObject(svg.use, ObjectMixin):
     '''Wrapper for SVG use.  Parameters:
     topleft: coordinates of the top left point of the shape's bounding box
     angle: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, href, topleft=(0,0), angle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, href, origin=(0,0), width=None, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.use.__init__(self, href=href)
-        self.pointList = [Point(topleft), Point(topleft)]
+        self.pointList = [Point(origin), Point(origin)]
         self.angle = angle
         self.update()
+        if objid: self.id = objid
 
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
@@ -359,7 +366,7 @@ class BezierObject(svg.path, ObjectMixin):
     (previous-control-point, vertex, next-control-point).
     For the first vertex, the previous-control-point must be None,
     and for the last vertex, the next-control-point must be None.'''
-    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none"):
+    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none", objid=None):
         def toPoint(coords):
             return None if coords is None else Point(coords)
         svg.path.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
@@ -370,6 +377,7 @@ class BezierObject(svg.path, ObjectMixin):
             pointsetlist = self.getpointsetlist(self.pointList)
         self.pointsetList = [[toPoint(coords) for coords in pointset] for pointset in pointsetlist]
         self.update()
+        if objid: self.id = objid
 
     def getpointsetlist(self, pointlist):
         pointsetlist = [[None, pointlist[0], (pointlist[0]+pointlist[1])/2]]
@@ -398,7 +406,7 @@ class ClosedBezierObject(BezierObject):
     OR  pointsetlist: a list of tuples, each tuple consisting of three points:
     (previous-control-point, vertex, next-control-point).
     The path will be closed (the first vertex does not need to be repeated).'''
-    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, pointsetlist=None, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.path.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         if pointsetlist:
             self.pointList = [Point(pointset[1]) for pointset in pointsetlist]
@@ -407,6 +415,7 @@ class ClosedBezierObject(BezierObject):
             pointsetlist = self.getpointsetlist(self.pointList)
         self.pointsetList = [[Point(coords) for coords in pointset] for pointset in pointsetlist]
         self.update()
+        if objid: self.id = objid
 
     def getpointsetlist(self, pointlist):
         pointsetlist = [[(pointlist[0]+pointlist[-1])/2, pointlist[0], (pointlist[0]+pointlist[1])/2]]
@@ -433,10 +442,10 @@ class SmoothBezierObject(SmoothBezierMixin, BezierObject):
     '''Wrapper for svg path element.  Parameter:
     pointlist: a list of vertices.
     Control points will be calculated automatically so that the curve is smooth at each vertex.'''
-    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none"):
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none", objid=None):
         self.pointList = [Point(coords) for coords in pointlist]
         pointsetlist = self.getpointsetlist(self.pointList)
-        BezierObject.__init__(self, pointsetlist, linecolour=linecolour, linewidth=linewidth, fillcolour=fillcolour)
+        BezierObject.__init__(self, pointsetlist, linecolour=linecolour, linewidth=linewidth, fillcolour=fillcolour, objid=objid)
 
     def getpointsetlist(self, pointlist):
         if len(pointlist) == 2: return [[None]+pointlist, pointlist+[None]]
@@ -461,10 +470,10 @@ class SmoothClosedBezierObject(SmoothBezierMixin, ClosedBezierObject):
     pointlist: a list of vertices.
     The path will be closed (the first vertex does not need to be repeated).
     Control points will be calculated automatically so that the curve is smooth at each vertex.'''
-    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         self.pointList = [Point(coords) for coords in pointlist]
         pointsetlist = self.getpointsetlist(self.pointList)
-        ClosedBezierObject.__init__(self, pointsetlist, linecolour=linecolour, linewidth=linewidth, fillcolour=fillcolour)
+        ClosedBezierObject.__init__(self, pointsetlist, linecolour=linecolour, linewidth=linewidth, fillcolour=fillcolour, objid=objid)
 
     def getpointsetlist(self, pointlist):
         pointlist = [pointlist[-1]]+pointlist[:]+[pointlist[0]]
@@ -488,12 +497,13 @@ class PointObject(svg.circle, ObjectMixin):
     '''A point (small circle) on a diagram. Parameters:
     XY: the coordinates of the point,
     pointsize: (optional) the radius of the point.'''
-    def __init__(self, XY=(0,0), colour="black", pointsize=2, canvas=None):
+    def __init__(self, XY=(0,0), colour="black", pointsize=2, canvas=None, objid=None):
         (x, y) = XY
         sf = canvas.scaleFactor if canvas else 1
         svg.circle.__init__(self, cx=x, cy=y, r=pointsize*sf, style={"stroke":colour, "stroke-width":1, "fill":colour, "vector-effect":"non-scaling-stroke"})
         self._XY = None
         self.XY = Point(XY)
+        if objid: self.id = objid
 
     def update(self):
         pass
@@ -514,7 +524,7 @@ class RegularPolygon(PolygonObject):
     EITHER centre: the centre of the polygon, OR startpoint: the coordinates of a vertex at the top of the polygon
     EITHER radius: the radius of the polygon, OR sidelength: the length of each side
     offsetangle: (optional) the angle (in degrees, clockwise) by which the top edge of the polygon is rotated from the horizontal.'''
-    def __init__(self, sidecount=0, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow"):
+    def __init__(self, sidecount=0, centre=None, radius=None, startpoint=None, sidelength=None, offsetangle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         pointlist = []
         if sidecount>0:
             angle = 2*pi/sidecount
@@ -527,24 +537,25 @@ class RegularPolygon(PolygonObject):
             for i in range(sidecount):
                 t = radoffset+i*angle
                 pointlist.append(Point((cx+radius*sin(t), cy-radius*cos(t))))
-        PolygonObject.__init__(self, pointlist, linecolour, linewidth, fillcolour)
+        PolygonObject.__init__(self, pointlist, linecolour, linewidth, fillcolour, objid)
 
 class GroupObject(svg.g, ObjectMixin):
     '''Wrapper for SVG g element. Parameters:
     objlist: list of the objects to include in the group
-    id: (optional) id to identify the element in the DOM'''
-    def __init__(self, objlist=[]):
+    objid: (optional) id to identify the element in the DOM'''
+    def __init__(self, objlist=[], objid=None):
         svg.g.__init__(self)
         if not isinstance(objlist, list): objlist = [objlist]
         self.objectList = []
         self._canvas = None
         for obj in objlist:
             self.addObject(obj)
+        if objid: self.id = objid
 
     def addObject(self, svgobject, objid=None):
         canvas = self.canvas
         if canvas is not None: canvas.addObject(svgobject, objid)
-        if objid: svgobject.attrs["id"] = objid
+        if objid: svgobject.id = objid
         self <= svgobject
         svgobject.group = self
         self.objectList.append(svgobject)
@@ -663,7 +674,7 @@ class CanvasObject(svg.svg):
     width, height: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc.
                     (to set the SVG attributes which are in pixels, call canvas.setDimensions() after creating the object.)
     colour: the background colour
-    id: the DOM id
+    objid: the DOM id
 
     To add objects to the canvas, use canvas.addObject.
     Objects are stored in canvas.objectDict using their id as the dictionary key. (if not supplied, ids are made up.)
@@ -709,7 +720,7 @@ class CanvasObject(svg.svg):
         svg.svg.__init__(self, style={"backgroundColor":colour})
         if width: self.style.width = width
         if height: self.style.height = height
-        self.id = objid if objid else f"canvas{id(self)}"
+        self.id = objid if id else f"canvas{id(self)}"
         self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
         self.mouseMode = MouseMode.DRAG
@@ -1027,6 +1038,7 @@ class CanvasObject(svg.svg):
         if self.selectedObject and not self.selectedObject.fixed:
             self.mouseOwner = self.selectedObject
             self <= self.mouseOwner
+            if (hittarget := getattr(self.mouseOwner, "hitTarget", None)): self <= hittarget
             self.StartPoint = self.getSVGcoords(event)
             self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
