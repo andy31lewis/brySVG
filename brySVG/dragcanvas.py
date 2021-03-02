@@ -775,6 +775,8 @@ class CanvasObject(svg.svg):
         self.bind("dragstart", self.onDragStart)
         self.bind("dblclick", self.onDoubleClick)
         document.bind("keydown", self.onKeyDown)
+        self.bind("click", self.onClick)
+        self.bind("touchstart", self.onClick)
 
     def setViewBox(self, pointlist):
         '''Should be done after the canvas has been added to the page.
@@ -1045,6 +1047,11 @@ class CanvasObject(svg.svg):
             self.mouseOwner = None
         elif self.mouseMode == MouseMode.EDIT:
             self.endEdit(event)
+
+    def onClick(self, event):
+        obj = self.getSelectedObject(event.target.id)
+        if obj and hasattr(obj, "hitTarget"):
+            obj.dispatchEvent(window.MouseEvent.new("click"))
 
     def onDoubleClick(self, event):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
