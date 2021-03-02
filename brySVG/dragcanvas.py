@@ -775,8 +775,6 @@ class CanvasObject(svg.svg):
         self.bind("dragstart", self.onDragStart)
         self.bind("dblclick", self.onDoubleClick)
         document.bind("keydown", self.onKeyDown)
-        self.bind("click", self.onClick)
-        self.bind("touchstart", self.onClick)
 
     def setViewBox(self, pointlist):
         '''Should be done after the canvas has been added to the page.
@@ -979,6 +977,8 @@ class CanvasObject(svg.svg):
                 newobj = obj.cloneObject()
             newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
             newobj.style.opacity = 0
+            newobj.bind("click", self.onHitTargetClick)
+            newobj.bind("touchend", self.onHitTargetTouchEnd)
             newobj.reference = obj
             obj.hitTarget = newobj
             self.hittargets.append(newobj)
@@ -1048,10 +1048,15 @@ class CanvasObject(svg.svg):
         elif self.mouseMode == MouseMode.EDIT:
             self.endEdit(event)
 
-    def onClick(self, event):
-        obj = self.getSelectedObject(event.target.id)
-        if obj and hasattr(obj, "hitTarget"):
-            obj.dispatchEvent(window.MouseEvent.new("click"))
+    def onHitTargetClick(self, event):
+        obj = self.objectDict[event.target.id]
+        obj.reference.dispatchEvent(window.MouseEvent.new("click"))
+
+    def onHitTargetTouchEnd(self, event):
+        event.preventDefault()
+        latesttime = time.time()
+        if latesttime - lasttaptime < 0.6:
+            self.onHitTargetClick(event)
 
     def onDoubleClick(self, event):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
