@@ -164,7 +164,7 @@ class TransformCanvasMixin(object):
             vec2 = (x2, y2) = currentcoords - centre
             transformtype = self.mouseOwner.transformType
 
-            self.selectedObject.attrs["transform"] = ""
+            self.selectedObject.style.transform = "translate(0px,0px)"
             if transformtype == TransformType.TRANSLATE:
                 self.selectedObject.translate(offset)
             elif transformtype == TransformType.ROTATE:
@@ -288,39 +288,39 @@ class TransformHandle(PointObject):
         (x, y) = self.startx + dx, self.starty + dy
         self.XY = (x, y)
         if self.transformType == TransformType.TRANSLATE:
-            transformstring = "translate({},{})".format(dx, dy)
+            transformstring = f"translate({dx}px,{dy}px)"
             if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
-                self.owner.attrs["transform"] = transformstring + self.owner.rotatestring
+                self.owner.style.transform = transformstring + self.owner.rotatestring
             else:
-                self.owner.attrs["transform"] = transformstring
+                self.owner.style.transform = transformstring
             return
 
         (cx, cy) = self.owner.centre
         (x1, y1) = self.startx - cx, self.starty - cy
         (x2, y2) = x -cx, y - cy
-
+        self.owner.style.transformOrigin = f"{cx}px {cy}px"
         if self.transformType == TransformType.ROTATE:
             (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
             angle = atan2(y3, x3)*180/pi
-            transformstring = "rotate({},{},{})".format(angle,cx,cy)
+            transformstring = f"rotate({angle}deg)"
             if not self.canvas.usebox:
                 self.canvas.rotateLine.pointList = [self.owner.centre, self.XY]
                 self.canvas.rotateLine.update()
         elif self.transformType == TransformType.XSTRETCH:
             xfactor = x2/x1
             yfactor = xfactor if isinstance(self.owner, CircleObject) else 1
-            transformstring = "translate({},{}) scale({},{}) translate({},{})".format(cx, cy, xfactor, yfactor, -cx, -cy)
+            transformstring = f"scale({xfactor},{yfactor})"
         elif self.transformType == TransformType.YSTRETCH:
             yfactor = y2/y1
             xfactor = yfactor if isinstance(self.owner, CircleObject) else 1
-            transformstring = "translate({},{}) scale({},{}) translate({},{})".format(cx, cy, xfactor, yfactor, -cx, -cy)
+            transformstring = f"scale({xfactor},{yfactor})"
         elif self.transformType == TransformType.ENLARGE:
-            transformstring = "translate({},{}) scale({}) translate({},{})".format(cx, cy, hypot(x2, y2)/hypot(x1, y1), -cx, -cy)
+            transformstring = f"scale({hypot(x2, y2)/hypot(x1, y1)})"
 
         if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
-            self.owner.attrs["transform"] = self.owner.rotatestring + transformstring
+            self.owner.style.transform = self.owner.rotatestring + transformstring
         else:
-            self.owner.attrs["transform"] = transformstring
+            self.owner.style.transform = transformstring
 
 classes = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, BezierObject,
 ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject, PointObject, RegularPolygon, GroupObject]

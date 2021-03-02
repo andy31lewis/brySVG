@@ -277,12 +277,12 @@ class RectangleObject(svg.rect, ObjectMixin):
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
-        t = svgbase.createSVGTransform()
-        t.setRotate(self.angle, cx, cy)
-        self.transform.baseVal.initialize(t)
-        self.rotatestring = self.attrs["transform"]
+        self.rotatestring = self.style.transform = f"rotate({self.angle}deg)"
+        self.style.transformOrigin = f"{cx}px {cy}px"
 
-        basepointlist = self.transformedpointlist(t.matrix.inverse())
+        t = svgbase.createSVGTransform()
+        t.setRotate(-self.angle, cx, cy)
+        basepointlist = self.transformedpointlist(t.matrix)
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["x"] = x2 if x2<x1 else x1
         self.attrs["y"] = y2 if y2<y1 else y1
@@ -303,12 +303,12 @@ class EllipseObject(svg.ellipse, ObjectMixin):
     def update(self):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
-        t = svgbase.createSVGTransform()
-        t.setRotate(self.angle, cx, cy)
-        self.transform.baseVal.initialize(t)
-        self.rotatestring = self.attrs["transform"]
+        self.rotatestring = self.style.transform = f"rotate({self.angle}deg)"
+        self.style.transformOrigin = f"{cx}px {cy}px"
 
-        basepointlist = self.transformedpointlist(t.matrix.inverse())
+        t = svgbase.createSVGTransform()
+        t.setRotate(-self.angle, cx, cy)
+        basepointlist = self.transformedpointlist(t.matrix)
         [(x1, y1), (x2, y2)] = basepointlist
         self.attrs["cx"]=(x1+x2)/2
         self.attrs["cy"]=(y1+y2)/2
@@ -359,7 +359,8 @@ class UseObject(svg.use, ObjectMixin):
         (self.attrs["x"], self.attrs["y"]) = self.origin
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
-        self.rotatestring = self.attrs["transform"] = f"rotate({self.angle}, {cx}, {cy})"
+        self.rotatestring = self.style.transform = f"rotate({self.angle}deg)"
+        self.style.transformOrigin = f"{cx}px {cy}px"
 
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
@@ -651,13 +652,13 @@ class ImageButton(GroupObject):
         (x, y), (width, height) = position, size
         self.button = RectangleObject([(x,y),(x+width, y+height)], fillcolour=fillcolour)
         self.button.attrs["rx"] = height/3
-        image.attrs["transform"] = "translate({},{})".format(x+width/2, y+height/2)
+        image.style.transform = f"translate({x+width/2}px,{y+height/2}px)"
         if canvas:
             canvas <= image
             bbox = image.getBBox()
             canvas.removeChild(image)
             scalefactor = min(width/bbox.width, height/bbox.height)*0.7
-            image.attrs["transform"] += " scale({})".format(scalefactor)
+            image.style.transform += f" scale({scalefactor})"
         self.addObjects([self.button, image])
         self.fixed = True
         self.bind("mousedown", self.onMouseDown)
@@ -729,7 +730,7 @@ class CanvasObject(svg.svg):
         svg.svg.__init__(self, style={"backgroundColor":colour})
         if width: self.style.width = width
         if height: self.style.height = height
-        self.id = objid if id else f"canvas{id(self)}"
+        self.id = objid if objid else f"canvas{id(self)}"
         self.objectDict = {} # See above
         #Attributes intended to be read/write for users - see above for usage
         self.mouseMode = MouseMode.NONE
@@ -1045,7 +1046,7 @@ class CanvasObject(svg.svg):
         elif self.mouseMode == MouseMode.EDIT:
             self.endEdit(event)
 
-    def onDoubleClick(self,event):
+    def onDoubleClick(self, event):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
 
     def onKeyDown(self, event):
@@ -1065,12 +1066,12 @@ class CanvasObject(svg.svg):
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         dx, dy = (x-self.startx)*self.scaleFactor, (y-self.starty)*self.scaleFactor
-        self.mouseOwner.attrs["transform"] = "translate({},{})".format(dx, dy)
+        self.mouseOwner.style.transform = f"translate({dx}px,{dy}px)"
         if isinstance(self.mouseOwner, [EllipseObject, RectangleObject, UseObject]):
-            self.mouseOwner.attrs["transform"] += self.mouseOwner.rotatestring
+            self.mouseOwner.style.transform += self.mouseOwner.rotatestring
 
     def endDrag(self, event):
-        self.mouseOwner.attrs["transform"] = ""
+        self.mouseOwner.style.transform = "translate(0px,0px)"
         currentcoords = self.getSVGcoords(event)
         offset = currentcoords - self.StartPoint
         self.translateObject(self.mouseOwner, offset)
