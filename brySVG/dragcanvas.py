@@ -977,8 +977,8 @@ class CanvasObject(svg.svg):
                 newobj = obj.cloneObject()
             newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
             newobj.style.opacity = 0
-            newobj.bind("click", self.onHitTargetClick)
-            newobj.bind("touchend", self.onHitTargetTouchEnd)
+            for event in ["mousedown", "mousemove", "mouseup", "click"]: newobj.bind(event, self.onHitTargetMouseEvent)
+            for event in ["touchstart", "touchmove", "touchend"]: newobj.bind(event, self.onHitTargetTouchEvent)
             newobj.reference = obj
             obj.hitTarget = newobj
             self.hittargets.append(newobj)
@@ -1048,15 +1048,25 @@ class CanvasObject(svg.svg):
         elif self.mouseMode == MouseMode.EDIT:
             self.endEdit(event)
 
-    def onHitTargetClick(self, event):
+    def onHitTargetMouseEvent(self, event):
+        eventdict = {attr: getattr(event, attr) for attr in dir(event)}
+        eventdict["bubbles"] = False
+        newevent = window.MouseEvent.new(event.type, eventdict)
         obj = self.objectDict[event.target.id]
-        obj.reference.dispatchEvent(window.MouseEvent.new("click"))
+        obj.reference.dispatchEvent(newevent)
 
-    def onHitTargetTouchEnd(self, event):
-        event.preventDefault()
+    def onHitTargetTouchEvent(self, event):
+        eventdict = {attr: getattr(event, attr) for attr in dir(event)}
+        eventdict["bubbles"] = False
+        newevent = window.TouchEvent.new(event.type, eventdict)
+        obj = self.objectDict[event.target.id]
+        obj.reference.dispatchEvent(newevent)
         latesttime = time.time()
-        if latesttime - lasttaptime < 0.6:
-            self.onHitTargetClick(event)
+        if event.type == "touchend" and latesttime - lasttaptime < 0.6:
+            eventdict["clientX"] = event.changedTouches[0].clientX
+            eventdict["clientY"] = event.changedTouches[0].clientY
+            newevent = window.TouchEvent.new("click", eventdict)
+            obj.reference.dispatchEvent(newevent)
 
     def onDoubleClick(self, event):
         if self.mouseMode == MouseMode.DRAW: self.endDraw(event)
