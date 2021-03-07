@@ -17,6 +17,8 @@ svgbase = svg.svg()
 basepoint = svgbase.createSVGPoint()
 lasttaptime = 0
 fixeddefault = False
+MOUSEEVENTS = ["mousedown", "mousemove", "mouseup", "click"]
+TOUCHEVENTS = ["touchstart", "touchmove", "touchend"]
 
 class Enum(list):
     def __init__(self, name, string):
@@ -977,8 +979,8 @@ class CanvasObject(svg.svg):
                 newobj = obj.cloneObject()
             newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
             newobj.style.opacity = 0
-            for event in ["mousedown", "mousemove", "mouseup", "click"]: newobj.bind(event, self.onHitTargetMouseEvent)
-            for event in ["touchstart", "touchmove", "touchend"]: newobj.bind(event, self.onHitTargetTouchEvent)
+            for event in MOUSEEVENTS: newobj.bind(event, self.onHitTargetMouseEvent)
+            for event in TOUCHEVENTS: newobj.bind(event, self.onHitTargetTouchEvent)
             newobj.reference = obj
             obj.hitTarget = newobj
             self.hittargets.append(newobj)
@@ -1065,7 +1067,7 @@ class CanvasObject(svg.svg):
         if event.type == "touchend" and latesttime - lasttaptime < 0.6:
             eventdict["clientX"] = event.changedTouches[0].clientX
             eventdict["clientY"] = event.changedTouches[0].clientY
-            newevent = window.TouchEvent.new("click", eventdict)
+            newevent = window.MouseEvent.new("click", eventdict)
             obj.reference.dispatchEvent(newevent)
 
     def onDoubleClick(self, event):
