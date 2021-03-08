@@ -857,6 +857,13 @@ class CanvasObject(svg.svg):
             svgobject.update()
         return svgobject
 
+    def addObjects(self, objectlist, fixed=fixeddefault):
+        for obj in objectlist:
+            if isinstance(obj, (list, tuple)):
+                self.addObjects(obj, fixed=fixed)
+            else:
+                self.addObject(obj, fixed=fixed)
+
     def deleteObject(self, svgobject):
         '''Delete an object from the canvas'''
         def deletefromdict(svgobj):
