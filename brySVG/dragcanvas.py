@@ -153,9 +153,9 @@ class TextObject(svg.text, ObjectMixin):
         if anchorposition in [1, 2, 3]:
             yoffset = fontsize
         elif anchorposition in [4, 5, 6]:
-            yoffset = fontsize*(1-rowcount/2)
+            yoffset = fontsize - lineheight*rowcount/2
         else:
-            yoffset = fontsize*(1-rowcount)
+            yoffset = fontsize - lineheight*rowcount
 
         svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos)
         for s in stringlist[1:]:
@@ -669,6 +669,9 @@ class ImageButton(GroupObject):
         self.attrs["cursor"] = "pointer"
 
     def onMouseDown(self, event):
+        event.stopPropagation()
+
+    def onMouseUp(self, event):
         event.stopPropagation()
 
     def setBackgroundColour(self, colour):
@@ -1195,7 +1198,14 @@ class Point(object):
         return str(tuple(self.coords))
 
     def __eq__(self, other):
-        return (self.coords == other.coords)
+        if isinstance(other, Point):
+            return (self.coords == other.coords)
+        elif isinstance(other, list):
+            return (self.coords == other)
+        elif isinstance(other, tuple):
+            return (tuple(self.coords) == other)
+        else:
+            return False
 
     def __lt__(self, other):
         return self.coords < other.coords
@@ -1224,6 +1234,9 @@ class Point(object):
 
     def __sub__(self, other):
         return Point([xi-yi for (xi, yi) in zip(self.coords, other.coords)])
+
+    def __neg__(self):
+        return Point([-xi for xi in self.coords])
 
     def __mul__(self, other):
         if isinstance(other, (int, float)):
