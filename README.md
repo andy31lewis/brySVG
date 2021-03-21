@@ -87,31 +87,31 @@ If the tool is `deletepoint`, then for `polyshapes` or `beziershapes` clicking o
 (For `line, rectangle, ellipse, circle`, the tools `insertpoint` and `deletepoint` have no effect.)
 
 ### Summary of attributes
-**Read/write attributes:**
-`canvas.mouseMode` (see above)
-`canvas.lineWidthScaling`: If this is set to `False`, line thicknesses are independent of the scaling of the canvas (default is `True`).
+**Read/write attributes:**  
+`canvas.mouseMode` (see above)  
+`canvas.lineWidthScaling`: If this is set to `False`, line thicknesses are independent of the scaling of the canvas (default is `True`).  
 
 *(Used if snapping required:)*
-`canvas.vertexSnap` (see above)
-`canvas.snapDistance` (see above)
-`canvas.edgeSnap` (Only available if `polygoncanvas` has been imported, see below)
+`canvas.vertexSnap` (see above)  
+`canvas.snapDistance` (see above)  
+`canvas.edgeSnap` (Only available if `polygoncanvas` has been imported, see below)  
 `canvas.snapAngle` (Only available if `polygoncanvas` has been imported, see below)
 
-*(Only available in `MouseMode.TRANSFORM`, see above:)*
+*(Only available in `MouseMode.TRANSFORM`, see above:)*  
 `canvas.transformTypes`
 
-*(Only available in `MouseMode.DRAW`, see above:)*
-`canvas.penColour` 
-`canvas.penWidth`
-`canvas.fillColour`
+*(Only available in `MouseMode.DRAW`, see above:)*  
+`canvas.penColour`   
+`canvas.penWidth`  
+`canvas.fillColour`  
 
-Other attributes of canvas are intended to be **read-only**:
-`canvas.scaleFactor`  (Set automatically by `canvas.setViewBox()` or `canvas.fitContents()`) Multiply by this to convert CSS pixels to SVG units
-`canvas.mouseDetected` If false, indicates a touchscreen device
-`canvas.mouseOwner` The object (shape or handle) currently being dragged
-`canvas.selectedObject` The shape which was last clicked on or dragged
-`canvas.dragStartCoords` The coordinates at which the latest drag started
-`canvas.viewWindow` After `canvas.setViewBox()` or `canvas.fitContents()`, this gives the SVG coordinates of the top-left and bottom-right of the canvas.
+Other attributes of canvas are intended to be **read-only**:  
+`canvas.scaleFactor`  (Set automatically by `canvas.setViewBox()` or `canvas.fitContents()`). Multiply by this to convert CSS pixels to SVG units  
+`canvas.mouseDetected` If false, indicates a touchscreen device  
+`canvas.mouseOwner` The object (shape or handle) currently being dragged  
+`canvas.selectedObject` The shape which was last clicked on or dragged  
+`canvas.dragStartCoords` The coordinates at which the latest drag started  
+`canvas.viewWindow` After `canvas.setViewBox()` or `canvas.fitContents()`, this gives the SVG coordinates of the top-left and bottom-right of the canvas.  
 `canvas.tool` Only useful in `MouseMode.DRAW `or `mouseMODE.EDIT` - the current tool (see above)
 
 ### Canvas Methods  
@@ -188,10 +188,10 @@ The following `XxxObject` classes which represent shapes share various common pa
 ### Common Parameters
 
 When created, as well as the parameters listed for each type of Object, they all share the following optional parameters:
-`objid`: id of the object (for referencing in the document or using `canvas.getSelectedObject(id)`
-(The following are not applicable to `TextObject`, `WrappingTextObject`, `PointObject` or `UseObject`.)
-`linecolour`: colour of the "stroke" or outline of the shape
-`linewidth`: width of the outline of the shape (its "stroke-width")
+`objid`: id of the object (for referencing in the document or using `canvas.getSelectedObject(id)`  
+(The following are not applicable to `TextObject`, `WrappingTextObject`, `PointObject` or `UseObject`.)  
+`linecolour`: colour of the "stroke" or outline of the shape  
+`linewidth`: width of the outline of the shape (its "stroke-width")  
 `fillcolour`: colour of the interior of the shape (not applicable to LineObject). Use "none" if no fill desired.
 
 ### Common Attributes
@@ -272,7 +272,7 @@ Parameters:
 `pointlist`: Two diagonally opposite corners of the rectangle.  
 `angle`: The angle (in degrees, clockwise) through which the edges of the rectangle are rotated from horizontal and vertical.
 
-**`EllipseObject(pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None)` ** 
+**`EllipseObject(pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None)` **   
 Parameters:  
 `pointlist`: Two diagonally opposite corners of the bounding box of the ellipse.  
 `angle`: The angle (in degrees, clockwise) through which the edges of the bounding box are rotated from horizontal and vertical.
@@ -285,7 +285,7 @@ Parameters:
 **or** `pointlist`: a list of two points - the centre of the circle and any point on the circumference.  
 (If both are given, the `pointlist` takes priority.)
 
-**`LineObject(pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none", objid=None)` ** 
+**`LineObject(pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none", objid=None)` **   
 Parameters:  
 `pointlist`: the two endpoints of the line.  
 `style`: Either `"solid"`, `"faintdash1"` or `"faintdash2"` (the last two are for use when drawing graph paper).
@@ -299,11 +299,11 @@ The control points control the curvature of the curve at that vertex.
 For the first vertex, the `previous-control-point` must be `None`,
 and for the last vertex, the `next-control-point` must be `None`.
 
-**`ClosedBezierObject(pointsetlist=[((0,0), (0,0), (0,0))], linecolour="black", linewidth=1, fillcolour="yellow", objid=None)` **
+**`ClosedBezierObject(pointsetlist=[((0,0), (0,0), (0,0))], linecolour="black", linewidth=1, fillcolour="yellow", objid=None)` **  
 A closed general Bezier curve (the first vertex does not need to be repeated). Parameter:  
 `pointsetlist`: a list of tuples, each tuple consisting of three points: `(previous-control-point, vertex, next-control-point)`.
 
-**`SmoothBezierObject(pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none", objid=None)` ** 
+**`SmoothBezierObject(pointlist=[(0,0), (0,0)], linecolour="black", linewidth=1, fillcolour="none", objid=None)` **   
 A smooth Bezier curve. Parameter:  
 `pointlist`: a list of vertices. (Control points will be calculated automatically so that the curve is smooth at each vertex.)
 
@@ -353,18 +353,18 @@ Wrapper for SVG `g` element. Parameter:
 Attribute:
 `objectList`: To loop through all the objects in the group, use `for obj in group.objectList`
 
-Methods:
+Methods:  
 `addObject()`: add an object to the group
 `addObjects()`: add a list of objects to the group
 `removeObject()`: remove an object from the group (and from the canvas if the group is on the canvas)
 `deleteAll()`: remove all objects from the group (and from the canvas if the group is on the canvas)
 
-**`UseObject(href=None, origin=(0,0), angle=0, objid=None)`**
-Wrapper for SVG `use` element.  Parameters:
-`href`: the `#id` of the object being cloned
-`origin`: coordinates on the canvas of the point (0,0) of the object being cloned
-`angle`: an optional angle of rotation (clockwise, in degrees).
-Method:
+**`UseObject(href=None, origin=(0,0), angle=0, objid=None)`**  
+Wrapper for SVG `use` element.  Parameters:  
+`href`: the `#id` of the object being cloned  
+`origin`: coordinates on the canvas of the point (0,0) of the object being cloned  
+`angle`: an optional angle of rotation (clockwise, in degrees).  
+Method:  
 `obj.setPosition(origin)`: Move the object by changing its `origin`, after it has been added to the canvas.
 
 ## Polygon handling
