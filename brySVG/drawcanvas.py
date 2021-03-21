@@ -16,93 +16,93 @@ class NonBezierMixin(object):
     '''Methods for LineObject, PolylineObject, PolygonObject, CircleObject, EllipseObject and RectangleObject'''
     def setPoint(self, i, point):
         self.pointList[i] = point
-        self.update()
-        self.updatehittarget()
-
+        self._update()
+        self._updatehittarget()
+    """
     def setPoints(self, pointlist):
         self.pointList = pointlist
-        self.update()
-        self.updatehittarget()
-
-    def movePoint(self, coords):
+        self._update()
+        self._updatehittarget()
+    """
+    def _movePoint(self, coords):
        self.setPoint(-1, coords)
 
 class PolyshapeMixin(object):
     '''Methods for PolylineObject and PolygonObject.'''
-    def appendPoint(self, point):
+    def _appendPoint(self, point):
         self.pointList.append(point)
-        self.update()
+        self._update()
 
     def insertPoint(self, index, point):
         self.pointList.insert(index, point)
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
     def deletePoint(self, index):
         self.deletePoints(index, index+1)
 
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
 class BezierMixin(object):
     '''Methods for all types of BezierObject. The parameters point, pointlist, pointset etc should be (lists of) Point object(s).'''
     def setPointset(self, i, pointset):
         self.pointList[i] = pointset[1]
         self.pointsetList[i] = pointset
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
-    def setPointsets(self, pointsetlist):
+    def setPointsetList(self, pointsetlist):
         self.pointList = [pointset[1] for pointset in pointsetlist]
         self.pointsetList = pointsetlist
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
     def setPoint(self, i, point):
         self.pointList[i] = point
-        self.pointsetList = self.getpointsetlist(self.pointList)
-        self.update()
-        self.updatehittarget()
-
+        self.pointsetList = self._getpointsetlist(self.pointList)
+        self._update()
+        self._updatehittarget()
+    """
     def setPoints(self, pointlist):
         self.pointList = pointlist
-        self.pointsetList = self.getpointsetlist(pointlist)
-        self.update()
-        self.updatehittarget()
-
-    def appendPoint(self, point):
+        self.pointsetList = self._getpointsetlist(pointlist)
+        self._update()
+        self._updatehittarget()
+    """
+    def _appendPoint(self, point):
         self.pointList.append(point)
-        self.pointsetList = self.getpointsetlist(self.pointList)
-        self.update()
+        self.pointsetList = self._getpointsetlist(self.pointList)
+        self._update()
 
     def deletePoints(self, start, end):
         del self.pointList[slice(start, end)]
-        self.pointsetList = self.getpointsetlist(self.pointList)
-        self.update()
-        self.updatehittarget()
+        self.pointsetList = self._getpointsetlist(self.pointList)
+        self._update()
+        self._updatehittarget()
 
     def insertPoint(self, index, point):
         self.pointList.insert(index, point)
         if isinstance(self, SmoothBezierMixin):
-            self.pointsetList = self.getpointsetlist(self.pointList)
+            self.pointsetList = self._getpointsetlist(self.pointList)
         else:
             L = len(self.pointList)
             triple = [self.pointList[index-1], point, self.pointList[(index+1)%L]]
-            cpoint1, cpoint2 = SmoothBezierMixin.calculatecontrolpoints(self, triple)
+            cpoint1, cpoint2 = SmoothBezierMixin._calculatecontrolpoints(self, triple)
             #cpoint1, cpoint2 = (self.pointList[index-1]+point)/2, (self.pointList[(index+1)%L]+point)/2
             self.pointsetList.insert(index, [cpoint1, point, cpoint2])
             self.pointsetList[index-1][2] = cpoint1
             self.pointsetList[(index+1)%L][0] = cpoint2
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
     def deletePoint(self, index):
         point = self.pointList[index]
         del self.pointList[index]
         if isinstance(self, SmoothBezierMixin):
-            self.pointsetList = self.getpointsetlist(self.pointList)
+            self.pointsetList = self._getpointsetlist(self.pointList)
         else:
             L = len(self.pointsetList)
             #triple = [self.pointList[index-1], point, self.pointList[(index+1)%L]]
@@ -117,14 +117,14 @@ class BezierMixin(object):
                 self.pointsetList[(index-1)%L][2] = point
                 self.pointsetList[(index+1)%L][0] = point
             del self.pointsetList[index]
-        self.update()
-        self.updatehittarget()
+        self._update()
+        self._updatehittarget()
 
-    def movePoint(self, point):
+    def _movePoint(self, point):
         self.pointList[-1] = point
-        self.updatepointsetlist()
+        self._updatepointsetlist()
         if len(self.pointList) == 2:
-            self.update()
+            self._update()
         elif isinstance(self, (ClosedBezierObject, SmoothClosedBezierObject)):
             ((x1,x2),(x3,x4),(x5,x6)) = self.pointsetList[-2]
             ((x7,x8),(x9,x10),(x11,x12)) = self.pointsetList[-1]
@@ -139,25 +139,30 @@ class BezierMixin(object):
             self.attrs["d"] = " ".join(str(x) for x in self.plist)
 
 class DrawCanvasMixin(object):
-    def createObject(self, coords):
+    def setTool(self, tool):
+        if self.mouseMode == MouseMode.DRAW: self._endDraw()
+        self.tool = tool
+        self.mouseMode = MouseMode.EDIT if tool in {"select", "insertpoint", "deletepoint"} else MouseMode.DRAW
+
+    def _createObject(self, coords):
         colour = "none" if self.tool in ["polyline", "bezier", "smoothbezier"] else self.fillColour
         self.mouseOwner = shapetypes[self.tool](pointlist=[coords, coords], linecolour=self.penColour, linewidth=self.penWidth, fillcolour=colour)
         self.addObject(self.mouseOwner)
         self.mouseOwner.shapeType = self.tool
 
-    def drawPoint(self, event):
+    def _drawPoint(self, event):
         if self.tool == "select": return
         if self.mouseOwner:
             if isinstance(self.mouseOwner, (PolyshapeMixin, BezierMixin)):
                 coords = self.getSVGcoords(event)
-                self.mouseOwner.appendPoint(coords)
+                self.mouseOwner._appendPoint(coords)
         else:
             self.startx = self.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = self.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
             coords = self.getSVGcoords(event)
-            self.createObject(coords)
+            self._createObject(coords)
 
-    def endDraw(self, event=None):
+    def _endDraw(self, event=None):
         if not self.mouseOwner: return
         svgobj = self.mouseOwner
         if isinstance(svgobj, (PolyshapeMixin, BezierMixin)):
@@ -180,33 +185,39 @@ class DrawCanvasMixin(object):
         self.mouseMode = MouseMode.EDIT
         return svgobj
 
-    def createEditHitTargets(self):
+    def _createEditHitTargets(self):
         objlist = list(self.objectDict.values())
         for obj in objlist:
             if isinstance(obj, GroupObject): continue
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
-            if obj.fixed: continue
-            if isinstance(obj, (PolyshapeMixin, BezierMixin)):
+            if isinstance(obj, UseObject):
+                newobj = RectangleObject(obj.pointList, obj.angle)
+            elif obj.fixed:
+                continue
+            elif isinstance(obj, (PolyshapeMixin, BezierMixin)):
                 newobj = HitTarget(obj, self)
             else:
                 if obj.style.fill != "none": continue
                 newobj = obj.cloneObject()
-                newobj.reference = obj
                 newobj.style.strokeWidth = 10*self.scaleFactor if self.mouseDetected else 25*self.scaleFactor
-                newobj.style.opacity = 0
+            newobj.reference = obj
+            newobj.style.opacity = 0
+            if not isinstance(newobj, HitTarget):
+                for event in MOUSEEVENTS: newobj.bind(event, self._onHitTargetMouseEvent)
+                for event in TOUCHEVENTS: newobj.bind(event, self._onHitTargetTouchEvent)
             obj.hitTarget = newobj
             self.hittargets.append(newobj)
             self.addObject(newobj)
 
-    def prepareEdit(self, event):
+    def _prepareEdit(self, event):
         if self.selectedObject: self.deselectObject()
         svgobject = self.getSelectedObject(event.target.id, getGroup=False)
         if not svgobject or svgobject.fixed: return
         self.selectedObject = svgobject
         self.createHandles(svgobject)
         if self.tool == "insertpoint":
-            index, point = self.insertPoint(event)
+            index, point = self._insertPoint(event)
 
     def createHandles(self, svgobject):
         if isinstance(svgobject, BezierMixin):
@@ -231,7 +242,7 @@ class DrawCanvasMixin(object):
             self.handles = GroupObject([Handle(svgobject, i, coords, "red", self) for i, coords in enumerate(svgobject.pointList)])
             self <= self.handles
 
-    def movePoint(self, event):
+    def _movePoint(self, event):
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         dx, dy = x-self.currentx, y-self.currenty
@@ -239,13 +250,13 @@ class DrawCanvasMixin(object):
         self.currentx, self.currenty = x, y
         if self.mouseMode == MouseMode.DRAW:
             coords = self.getSVGcoords(event)
-            self.mouseOwner.movePoint(coords)
+            self.mouseOwner._movePoint(coords)
         else:
             if self.mouseMode == MouseMode.TRANSFORM: dx, dy = x-self.startx, y-self.starty
             dx, dy = dx*self.scaleFactor, dy*self.scaleFactor
-            self.mouseOwner.movePoint((dx, dy))
+            self.mouseOwner._movePoint((dx, dy))
 
-    def insertPoint(self, event):
+    def _insertPoint(self, event):
         if not self.selectedObject: return None, None
         try:
             index = self.objectDict[event.target.id].segmentindex
@@ -259,7 +270,7 @@ class DrawCanvasMixin(object):
         self.createHandles(svgobject)
         return index, clickpoint
 
-    def deletePoint(self, index):
+    def _deletePoint(self, index):
         if not self.selectedObject: return None
         if not isinstance(self.selectedObject, (PolyshapeMixin, BezierObject)): return None
         svgobject = self.selectedObject
@@ -272,9 +283,9 @@ class DrawCanvasMixin(object):
         self.createHandles(svgobject)
         return index
 
-    def endEdit(self, event):
+    def _endEdit(self, event):
         if self.selectedObject:
-            self.selectedObject.updatehittarget()
+            self.selectedObject._updatehittarget()
             if self.handles: self <= self.handles
             if self.controlhandles: self <= self.controlhandles
         self.mouseOwner = None
@@ -309,10 +320,11 @@ class HitTarget(GroupObject):
     def __init__(self, reference, canvas):
         GroupObject.__init__(self)
         self.reference = reference
+        self.style.cursor = reference.style.cursor
         self.canvas = canvas
-        self.update()
+        self._update()
 
-    def update(self):
+    def _update(self):
         self.deleteAll()
         width = 10*self.canvas.scaleFactor if self.canvas.mouseDetected else 25*self.canvas.scaleFactor
         if isinstance(self.reference, PolyshapeMixin):
@@ -343,15 +355,15 @@ class Handle(PointObject):
         self.owner = owner
         self.index = index
         self.canvas = canvas
-        self.bind("mousedown", self.select)
-        self.bind("touchstart", self.select)
+        self.bind("mousedown", self._select)
+        self.bind("touchstart", self._select)
 
-    def select(self, event):
+    def _select(self, event):
         if event.type == "mousedown" and event.button > 0: return
         event.preventDefault()
         event.stopPropagation()
         if self.canvas.tool == "deletepoint":
-            self.canvas.deletePoint(self.index)
+            self.canvas._deletePoint(self.index)
             return
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -362,7 +374,7 @@ class Handle(PointObject):
             for ch in self.controlHandles: ch.style.visibility = "visible"
         self.canvas.selectedhandle = self
 
-    def movePoint(self, offset):
+    def _movePoint(self, offset):
         self.XY += offset
         if isinstance(self.owner, BezierMixin):
             pointset = [None, self.XY, None]
@@ -386,16 +398,16 @@ class ControlHandle(PointObject):
         self.index = index
         self.subindex = subindex
         self.canvas = canvas
-        self.bind("mousedown", self.select)
-        self.bind("touchstart", self.select)
+        self.bind("mousedown", self._select)
+        self.bind("touchstart", self._select)
 
-    def select(self, event):
+    def _select(self, event):
         event.stopPropagation()
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         self.canvas.mouseOwner = self
 
-    def movePoint(self, offset):
+    def _movePoint(self, offset):
         self.XY += offset
         pointset = self.owner.pointsetList[self.index]
         pointset[self.subindex] = self.XY

@@ -160,9 +160,10 @@ class PolygonMixin(object):
         return boundary([self, other])
 
 class PolygonGroup(GroupObject, PolygonMixin):
-    def __init__(self, objlist=[]):
+    def __init__(self, objlist=[], objid=None):
         self.boundary = None
         super().__init__(objlist)
+        if objid: self.id = objid
 
     def __repr__(self):
         return f"group {self.id}" if self.id else f"group {id(self)}"
@@ -170,7 +171,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
     def __str__(self):
         return self.__repr__()
 
-    def addObject(self, svgobject, objid=None):
+    def addObject(self, svgobject):
         if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return False
         if self.objectList == []:
             self.boundary = PolygonObject(svgobject.pointList)
@@ -183,7 +184,7 @@ class PolygonGroup(GroupObject, PolygonMixin):
             else:
                 self.boundary = newboundary
 
-        super().addObject(svgobject, objid)
+        super().addObject(svgobject)
         #self.update()
         return True
 
@@ -253,9 +254,9 @@ class PolygonGroup(GroupObject, PolygonMixin):
         pointslist = []
         addalltopointslist(self)
         #window.transformpoints(pointslist, matrix)
-        self.transformpoints(pointslist, matrix)
+        self._transformpoints(pointslist, matrix)
 
-    def transformpoints(self, pointslist, matrix):
+    def _transformpoints(self, pointslist, matrix):
         for points in pointslist:
             L = points.numberOfItems
             for i in range(L):
@@ -274,7 +275,7 @@ class PolygonCanvasMixin(object):
     If edgeSnap is set to True, then after a drag or rotate, if an edge of the moved object is within snapAngle degrees
     (default is 10) and snapDistance SVG units (default 10) of an edge of another object in the canvas's objectDict,
     the moved object is snapped so that the edges coincide.'''
-    def doEdgeSnap(self, svgobject):
+    def _doEdgeSnap(self, svgobject):
         tt = time.time()
         if not isinstance(svgobject, (PolygonObject, PolygonGroup)): return
         snapangle = self.snapAngle*pi/180
@@ -428,9 +429,9 @@ class PolygonCanvasMixin(object):
 
         if bestangle is not None: #First snap the edges together
             #print("Angle, centre, vector", angle*180/pi, centre, vector)
-            if not (angle ==0 and vector == (0, 0)): svgobject.rotateandtranslate(angle*180/pi, centre, vector)
+            if not (angle ==0 and vector == (0, 0)): svgobject.rotateAndTranslate(angle*180/pi, centre, vector)
         if self.vertexSnap: #Even if we can't snap the edges, can still try to snap the vertices
-            self.doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
+            self._doVertexSnap(svgobject, [p for obj in checkobjs for p in obj.pointList])
         #print("ES-dosnap", time.time()-tt)
 
 def _getboundingbox(poly, xdp=None, ydp=None):
@@ -599,7 +600,6 @@ def relativeposition(self, other):
 
     polyA, polyB = getattr(self, "boundary", self), getattr(other, "boundary", other)
     coordslist1, coordslist2 = _getrotatedcoords([polyA, polyB], xdp=dp)
-    #print("Coords1",coordslist1,"\nCoords2",coordslist2)
 
     transposed = False
     bboxresult = _compareboundingboxes(coordslist1, coordslist2, ydp=dp)
