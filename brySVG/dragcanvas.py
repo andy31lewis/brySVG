@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2020 Andy Lewis                                          #
+# Copyright (c) 2014-2021 Andy Lewis                                          #
 # --------------------------------------------------------------------------- #
 # This program is free software; you can redistribute it and/or modify it     #
 # under the terms of the GNU General Public License version 2 as published by #
@@ -62,7 +62,7 @@ class ObjectMixin(object):
 
     def setPointList(self, pointlist):
         '''Change the shape of an object by replacing its `pointList`. Not valid for `PointObjects`, `UseObjects`, `TextObjects` or `WrappingTextObjects`.'''
-        self.pointList = pointlist
+        self.pointList = [Point(coords) for coords in pointlist]
         if isinstance(self, BezierObject): self.pointsetList = self._getpointsetlist(pointlist)
         self._update()
         self._updatehittarget()
@@ -312,7 +312,6 @@ class RectangleObject(svg.rect, ObjectMixin):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
-        #self.style.transformOrigin = f"{cx}px {cy}px"
 
         t = svgbase.createSVGTransform()
         t.setRotate(-self.angle, cx, cy)
@@ -392,15 +391,18 @@ class UseObject(svg.use, ObjectMixin):
 
     def _update(self):
         (x, y) = (self.attrs["x"], self.attrs["y"]) = self.origin
-        bbox = self.getBBox()
+        tempgroup = svg.g() #Needed to overcome bug in iPad getBBox implementation
+        tempgroup <= self.cloneNode(True)
+        self.canvas <= tempgroup
+        bbox = tempgroup.getBBox()
         self.pointList = [(bbox.x, bbox.y), (bbox.x+bbox.width, bbox.y+bbox.height)]
+        self.canvas.removeChild(tempgroup)
         [(x1, y1), (x2, y2)] = self.pointList
         self.centre = (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         t = svgbase.createSVGTransform()
         t.setRotate(self.angle, cx, cy)
         self.pointList = self._transformedpointlist(t.matrix)
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
-        #self.style.transformOrigin = f"{cx}px {cy}px"
 
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
