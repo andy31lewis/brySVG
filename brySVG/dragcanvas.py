@@ -404,6 +404,31 @@ class UseObject(svg.use, ObjectMixin):
         self.pointList = self._transformedpointlist(t.matrix)
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
 
+class ImageObject(svg.image, ObjectMixin):
+    def __init__(self, href, topleft=(0,0), width=0, height=None, objid=None):
+        (x, y) = topleft
+        if not height: height = width
+        super().__init__(href=href, x=x, y=y, width=width, height=height)
+        self.pointList = [Point((x, y)), Point((x+width, y+height))]
+        if objid: self.id = objid
+
+    def _update(self):
+        (x, y) = self.pointList[0]
+        self.attrs["x"] = x
+        self.attrs["y"] = y
+
+    def setPosition(self, topleft=None, centre=(0,0)):
+        [(x1, y1), (x2, y2)] = self.pointList
+        (width, height) = (x2-x1, y2-y1)
+        if topleft:
+            (x, y) = topleft
+        elif centre:
+            (cx, cy) = centre
+            (x, y) = (cx-width/2, cy-height/2)
+        self.attrs["x"] = x
+        self.attrs["y"] = y
+        self.pointList = [Point((x, y)), Point((x+width, y+height))]
+
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
     EITHER pointlist: a list of coordinates for the vertices (in which case the edges will initially be straight lines)
