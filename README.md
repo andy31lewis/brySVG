@@ -219,7 +219,7 @@ Utility function to set a CSS style attribute, can be overridden for specific ty
 
 `obj.cloneObject`
 Returns a clone of an object, including the extra functionality provided by this module.
-If that functionality is not needed, it is better to call the DOM method `canvas.cloneNode(object)`, as that is much faster. Not valid for `UseObjects`, `TextObjects` or `WrappingTextObjects`.
+If that functionality is not needed, it is better to call the DOM method `canvas.cloneNode(object)`, as that is much faster. Not valid for `UseObjects`, `TextObjects` or `WrappingTextObjects`; for `ImageObjects` it can only be used in response to an event (eg a click) which occurs after the object was created.
 
 ***(The methods below are only available after `import transformcanvas`, `import polygoncanvas` or `import fullcanvas` )***
 

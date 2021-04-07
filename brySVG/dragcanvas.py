@@ -562,9 +562,9 @@ class ImageObject(svg.image, ObjectMixin):
         img.attrs["src"] = href
 
     def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
-    '''Change the position, size, and/or angle of the image.
-    If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
-    the other will be set so that the image keeps its current aspect ratio.'''
+        '''Change the position, size, and/or angle of the image.
+        If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
+        the other will be set so that the image keeps its current aspect ratio.'''
         def set_position(event=None):
             #print("Starting set_position")
             if centre: self.centre = Point(centre)
