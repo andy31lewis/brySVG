@@ -74,7 +74,7 @@ class TransformMixin(object):
         if not centre:
             bbox = self.getBBox()
             centre = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
-        if isinstance(self, (EllipseObject, RectangleObject)):
+        if isinstance(self, (EllipseObject, RectangleObject, ImageObject, UseObject)):
             self.angle += angle
         t = svgbase.createSVGTransform()
         t.setRotate(angle, *centre)
@@ -99,7 +99,7 @@ class TransformMixin(object):
         (x2, y2) = vec2
         (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
         angle = atan2(y3, x3)*180/pi
-        if isinstance(self, (EllipseObject, RectangleObject)):
+        if isinstance(self, (EllipseObject, RectangleObject, ImageObject, UseObject)):
             self.angle += angle
         matrix = svgbase.createSVGMatrix()
         matrix = matrix.translate(cx, cy)
@@ -110,8 +110,9 @@ class TransformMixin(object):
     def xstretch(self, xscale, cx=0):
         '''Stretch object in the x-direction by scale factor xscale, with invariant line x = cx.
         If cx is not given, the invariant line is the y-axis.'''
+        if isinstance(self, UseObject): return
         angle = 0
-        if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+        if isinstance(self, (EllipseObject, RectangleObject, ImageObject)) and self.angle != 0:
             angle = self.angle
             self.rotate(-angle)
         matrix = svgbase.createSVGMatrix()
@@ -124,8 +125,9 @@ class TransformMixin(object):
     def ystretch(self, yscale, cy=0):
         '''Stretch object in the y-direction by scale factor yscale, with invariant line y = cy.
         If cy is not given, the invariant line is the x-axis.'''
+        if isinstance(self, UseObject): return
         angle = 0
-        if isinstance(self, [EllipseObject, RectangleObject]) and self.angle != 0:
+        if isinstance(self, (EllipseObject, RectangleObject, ImageObject)) and self.angle != 0:
             angle = self.angle
             self.rotate(-angle)
         matrix = svgbase.createSVGMatrix()
@@ -138,6 +140,7 @@ class TransformMixin(object):
     def enlarge(self, scalefactor, centre=(0,0)):
         '''Enlarge object by scale factor scalefactor, from centre.
         If centre is not given, the centre is the origin.'''
+        if isinstance(self, UseObject): return
         (cx, cy) = centre
         matrix = svgbase.createSVGMatrix()
         matrix = matrix.translate(cx, cy)
@@ -203,8 +206,9 @@ class TransformCanvasMixin(object):
         self.hideTransformHandles()
 
         self.usebox = False
-        for ttype in self.transformTypes:
-            if ttype in [TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]: self.usebox = True
+        if not isinstance(svgobj, UseObject):
+            for ttype in self.transformTypes:
+                if ttype in [TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]: self.usebox = True
 
         if self.usebox:
             self.transformBBox.setPointList([Point((x1,y1)),Point((x2,y2))])
@@ -222,6 +226,7 @@ class TransformCanvasMixin(object):
             self <= self.rotateLine
             self.rotateLine.style.visibility = "visible"
         for ttype in self.transformTypes:
+            if isinstance(svgobj, UseObject) and ttype in [TransformType.XSTRETCH, TransformType.YSTRETCH, TransformType.ENLARGE]: continue
             thandle = self.transformHandles[ttype]
             self <= thandle
             if ttype != TransformType.TRANSLATE: thandle.style.visibility = "visible"
@@ -292,7 +297,7 @@ class TransformHandle(PointObject):
         self.XY = (x, y)
         if self.transformType == TransformType.TRANSLATE:
             transformstring = f"translate({dx}px,{dy}px)"
-            if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
+            if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)) and self.owner.angle != 0:
                 self.owner.style.transform = transformstring + self.owner.rotatestring
             else:
                 self.owner.style.transform = transformstring
@@ -320,13 +325,13 @@ class TransformHandle(PointObject):
         elif self.transformType == TransformType.ENLARGE:
             transformstring = f"translate({cx}px,{cy}px) scale({hypot(x2, y2)/hypot(x1, y1)}) translate({-cx}px,{-cy}px)"
 
-        if isinstance(self.owner, [EllipseObject, RectangleObject]) and self.owner.angle != 0:
+        if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)) and self.owner.angle != 0:
             self.owner.style.transform = self.owner.rotatestring + transformstring
         else:
             self.owner.style.transform = transformstring
 
 classes = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, BezierObject,
-ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject, PointObject, RegularPolygon, GroupObject]
+ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject, PointObject, RegularPolygon, GroupObject, ImageObject, UseObject]
 for cls in classes:
     cls.__bases__ = cls.__bases__ + (TransformMixin,)
     #print(cls, cls.__bases__)

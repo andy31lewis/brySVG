@@ -220,6 +220,7 @@ class DrawCanvasMixin(object):
             index, point = self._insertPoint(event)
 
     def createHandles(self, svgobject):
+        if isinstance(svgobject, UseObject): return
         if isinstance(svgobject, BezierMixin):
             handles = []
             for i, (point0, point1, point2) in enumerate(svgobject.pointsetList):
@@ -421,7 +422,7 @@ class ControlHandle(PointObject):
             self.linkedHandle.XY = newothercoords
         self.owner.setPointset(self.index, pointset)
 
-nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject]
+nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, ImageObject]
 for cls in nonbezier:
     cls.__bases__ = cls.__bases__ + (NonBezierMixin,)
     #print(cls, cls.__bases__)
