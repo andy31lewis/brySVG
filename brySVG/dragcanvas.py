@@ -304,8 +304,15 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
 class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
-    pointlist: a list of coordinates for two opposite vertices
-    angle: an optional angle of rotation (clockwise, in degrees).'''
+    EITHER:
+         `pointlist`: a list of coordinates for two opposite vertices of the rectangle
+    OR:
+        `centre`: coordinates of the centre of the rectangle
+        `width`: required width of the rectangle (before any rotation)
+        `height` required height of the rectangle (before any rotation)
+    (If only one of `width` and `height` is specified, the rectangle will be a square.)
+    `angle`: The angle (in degrees, clockwise) through which the sides of the rectangle
+     are rotated from horizontal and vertical.'''
     def __init__(self, pointlist=None, centre=(0,0), width=0, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.rect.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.angle = angle
@@ -321,6 +328,9 @@ class RectangleObject(svg.rect, ObjectMixin):
         if objid: self.id = objid
 
     def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        '''Change the position, size, and/or angle of the rectangle.
+        If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
+        the other will be set so that the rectangle keeps its current aspect ratio.'''
         if centre: self.centre = Point(centre)
         if width:
             self._width = width
@@ -358,8 +368,16 @@ class RectangleObject(svg.rect, ObjectMixin):
 
 class EllipseObject(svg.ellipse, ObjectMixin):
     '''Wrapper for SVG ellipse.  Parameters:
-    pointlist: a list of coordinates for two opposite vertices of the bounding box,
-    angle: an optional angle of rotation (clockwise, in degrees).'''
+    EITHER:
+         `pointlist`: a list of coordinates for two opposite vertices of the bounding box of the ellipse
+    OR:
+        `centre`: coordinates of the centre of the ellipse
+        `width`: required width of the ellipse (before any rotation)
+        `height` required height of the ellipse (before any rotation)
+    (If only one of `width` and `height` is specified, the ellipse will be a circle.)
+    `angle`: The angle (in degrees, clockwise) through which the sides of the ellipse's bounding box
+     are rotated from horizontal and vertical.
+    '''
     def __init__(self, pointlist=None, centre=(0,0), width=0, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.ellipse.__init__(self, style = {"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.angle = angle
@@ -375,6 +393,9 @@ class EllipseObject(svg.ellipse, ObjectMixin):
         if objid: self.id = objid
 
     def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        '''Change the position, size, and/or angle of the ellipse.
+        If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
+        the other will be set so that the ellipse keeps its current aspect ratio.'''
         if centre: self.centre = Point(centre)
         if width:
             self._width = width
@@ -433,10 +454,10 @@ class CircleObject(svg.circle, ObjectMixin):
 class UseObject(svg.use, ObjectMixin):
     '''Wrapper for SVG `use` element.  Parameters:
     `href`: the `#id` of the object being cloned
-    `origin`: coordinates on the canvas of the point (0,0) of the object being cloned
-    `angle`: an optional angle of rotation (clockwise, in degrees).
-    Methods:
-    `setPosition(origin)`: Move the object by changing its `origin`, after it has been added to the canvas'''
+    EITHER: `origin`: coordinates on the canvas of the point (0,0) of the object being cloned
+    OR: `centre`: coordinates of the centre of the object's bounding box
+    (If both are specified, the `origin` is used.)
+    `angle`: an optional angle of rotation (clockwise, in degrees).'''
     def __init__(self, href=None, origin=None, centre=(0,0), angle=0, objid=None):
         svg.use.__init__(self, href=href)
         document <= svgbase
@@ -463,6 +484,9 @@ class UseObject(svg.use, ObjectMixin):
         if objid: self.id = objid
 
     def setPosition(self, origin=None, centre=None, angle=None):
+        '''Move the object by changing EITHER its `origin` OR its `centre`
+        (if both are specified, the `origin` is used) OR neither.
+        The `angle` of the object can also be changed.'''
         if origin:
             self.origin = Point(origin)
             self.centre = self.origin - self.originoffset
@@ -487,6 +511,17 @@ class UseObject(svg.use, ObjectMixin):
         (self.attrs["x"], self.attrs["y"]) = self.origin
 
 class ImageObject(svg.image, ObjectMixin):
+    '''Wrapper for SVG `image` element.  Parameters:
+    `href`: the path to the file containing the image
+    EITHER:
+         `pointlist`: a list of coordinates for two opposite vertices  of the box containing the image
+    OR:
+        `centre`: coordinates of the centre of the image
+        `width`: required width of the image (before any rotation)
+        `height` required height of the image (before any rotation)
+    (If only one of `width` and `height` is specified, the other will be set so that the image keeps its actual aspect ratio.
+    If neither is specified, the image will be displayed at its actual size.)
+    `angle`: an optional angle of rotation (clockwise, in degrees). '''
     def __init__(self, href=None, pointlist=None, centre=(0,0), width=0, height=None, angle=0, objid=None):
         def initialise(event):
             nonlocal width, height
@@ -527,6 +562,9 @@ class ImageObject(svg.image, ObjectMixin):
         img.attrs["src"] = href
 
     def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+    '''Change the position, size, and/or angle of the image.
+    If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
+    the other will be set so that the image keeps its current aspect ratio.'''
         def set_position(event=None):
             #print("Starting set_position")
             if centre: self.centre = Point(centre)
