@@ -55,7 +55,9 @@ class ObjectMixin(object):
         else:
             return None
 
-        for (key, value) in self.attrs.items():
+        #for (key, value) in self.attrs.items():
+        for key in self.attrs:
+            value = self.attrs[key]
             newobject.attrs[key] = value
         newobject.id = ""
         return newobject
@@ -337,7 +339,6 @@ class EllipseObject(svg.ellipse, ObjectMixin):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
-        #self.style.transformOrigin = f"{cx}px {cy}px"
 
         t = svgbase.createSVGTransform()
         t.setRotate(-self.angle, cx, cy)
@@ -375,34 +376,54 @@ class UseObject(svg.use, ObjectMixin):
     `angle`: an optional angle of rotation (clockwise, in degrees).
     Methods:
     `setPosition(origin)`: Move the object by changing its `origin`, after it has been added to the canvas'''
-    def __init__(self, href=None, origin=(0,0), angle=0, objid=None):
+    def __init__(self, href=None, origin=None, centre=(0,0), angle=0, objid=None):
         svg.use.__init__(self, href=href)
-        self.origin = Point(origin)
+        document <= svgbase
+        tempgroup = svg.g() #Needed to overcome bug in iPad getBBox implementation
+        tempgroup <= self
+        svgbase <= tempgroup
+        bbox = tempgroup.getBBox()
+        svgbase.removeChild(tempgroup)
+        document.body.removeChild(svgbase)
+        (cx, cy) = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
+        self.centre = Point((cx, cy))
+        self._width = bbox.width
+        self._height = bbox.height
+        self.originoffset = -self.centre
+
+        if origin:
+            self.origin = Point(origin)
+            self.centre = self.origin - self.originoffset
+        else:
+            self.centre = Point(centre)
+            self.origin = self.centre + self.originoffset
         self.angle = angle
-        self.centre = (0, 0) # Correct centre will be set during canvas.addObject()
-        (self.attrs["x"], self.attrs["y"]) = origin
+        self.setPosition()
         if objid: self.id = objid
 
-    def setPosition(self, origin):
-        '''Can only be used after the object has been placed on the canvas using canvas.addObject()'''
-        self.origin = Point(origin)
+    def setPosition(self, origin=None, centre=None, angle=None):
+        if origin:
+            self.origin = Point(origin)
+            self.centre = self.origin - self.originoffset
+        elif centre:
+            self.centre = Point(centre)
+        if angle is not None: self.angle = angle
+
+        (cx, cy) = self.centre
+        self.pointList = [(cx-self._width/2, cy-self._height/2), (cx+self._width/2, cy+self._height/2)]
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.pointList = self._transformedpointlist(t.matrix)
         self._update()
         self._updatehittarget()
 
     def _update(self):
-        (x, y) = (self.attrs["x"], self.attrs["y"]) = self.origin
-        tempgroup = svg.g() #Needed to overcome bug in iPad getBBox implementation
-        tempgroup <= self.cloneNode(True)
-        self.canvas <= tempgroup
-        bbox = tempgroup.getBBox()
-        self.pointList = [(bbox.x, bbox.y), (bbox.x+bbox.width, bbox.y+bbox.height)]
-        self.canvas.removeChild(tempgroup)
         [(x1, y1), (x2, y2)] = self.pointList
-        self.centre = (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
-        t = svgbase.createSVGTransform()
-        t.setRotate(self.angle, cx, cy)
-        self.pointList = self._transformedpointlist(t.matrix)
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        self.centre = Point((cx, cy))
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
+        self.origin = self.centre + self.originoffset
+        (self.attrs["x"], self.attrs["y"]) = self.origin
 
 class ImageObject(svg.image, ObjectMixin):
     def __init__(self, href, topleft=(0,0), width=0, height=None, objid=None):
@@ -703,7 +724,7 @@ class Button(GroupObject):
         self.button.attrs["rx"] = height/3
         rowcount = text.count("\n") + 1
         if not fontsize: fontsize = height*0.75/rowcount
-        self.label = TextObject(text,(x+width/2,y+height/2-fontsize/6),anchorposition=5, fontsize=fontsize)
+        self.label = TextObject(text,(x+width/2,y+height/2-fontsize/8),anchorposition=5, fontsize=fontsize)
         self.addObjects([self.button, self.label])
         self.fixed = True
         self.bind("mousedown", self._onMouseDown)
@@ -977,7 +998,6 @@ class CanvasObject(svg.svg):
         self <= svgobject
         AddToDict(svgobject)
         svgobject.canvas = self
-        if isinstance(svgobject, UseObject): svgobject._update()
         return svgobject
 
     def addObjects(self, objectlist, fixed=False):
@@ -1027,8 +1047,6 @@ class CanvasObject(svg.svg):
             if boundary: self.translateObject(boundary, offset)
         elif isinstance(svgobject, PointObject):
             svgobject.XY += offset
-        elif isinstance(svgobject, UseObject):
-            svgobject.setPosition(svgobject.origin+offset)
         else:
             svgobject.pointList = [point+offset for point in svgobject.pointList]
             if isinstance(svgobject, BezierObject):
@@ -1143,14 +1161,14 @@ class CanvasObject(svg.svg):
 
     def _onTouchStart(self, event):
         event.preventDefault()
-        global lasttaptime
-        latesttaptime = time.time()
-        if latesttaptime - lasttaptime < 0.3:
-            for function in self.events("dblclick"):
-                function(event)
-        else:
-            self._onLeftDown(event)
-        lasttaptime = latesttaptime
+        #global lasttaptime
+        #latesttaptime = time.time()
+        #if latesttaptime - lasttaptime < 0.3:
+        #    for function in self.events("dblclick"):
+        #        function(event)
+        #else:
+        self._onLeftDown(event)
+        #lasttaptime = latesttaptime
 
     def _onMouseDown(self, event):
         if not self.mouseDetected:
