@@ -12,8 +12,9 @@
 import time
 from browser import document, alert, window
 import browser.svg as svg
+import browser.html as html
 from math import sin, cos, atan2, pi, hypot, floor, log10
-svgbase = svg.svg()
+svgbase = svg.svg(width=0, height=0)
 basepoint = svgbase.createSVGPoint()
 lasttaptime = 0
 MOUSEEVENTS = ["mousedown", "mousemove", "mouseup", "click"]
@@ -46,8 +47,10 @@ class ObjectMixin(object):
                     newobj.group = newobject
                     newobject.objectList.append(newobj)
         elif isinstance(self, ObjectMixin):
+            if isinstance(self, ImageObject) and not self.imageloaded: raise RuntimeError("ImageObject cannot be cloned until fully loaded")
             newobject = self.__class__()
-            for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed"]:
+            for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "rotatestring", "centre", "_width", "_height",
+                             "currentAspectRatio", "imageWidth", "imageHeight", "imageAspectRatio", "imageloaded"]:
                 attr = getattr(self, attrname, "NO_SUCH_ATTRIBUTE")
                 if attr == "NO_SUCH_ATTRIBUTE": continue
                 newattr = list(attr) if isinstance(attr, list) else attr
@@ -426,29 +429,89 @@ class UseObject(svg.use, ObjectMixin):
         (self.attrs["x"], self.attrs["y"]) = self.origin
 
 class ImageObject(svg.image, ObjectMixin):
-    def __init__(self, href, topleft=(0,0), width=0, height=None, objid=None):
-        (x, y) = topleft
-        if not height: height = width
-        super().__init__(href=href, x=x, y=y, width=width, height=height)
-        self.pointList = [Point((x, y)), Point((x+width, y+height))]
+    def __init__(self, href=None, pointlist=None, centre=(0,0), width=0, height=None, angle=0, objid=None):
+        def initialise(event):
+            nonlocal width, height
+            self.imageWidth = img.naturalWidth
+            self.imageHeight = img.naturalHeight
+            #print("Image size", self.imageWidth, self.imageHeight)
+            self.imageAspectRatio = self.imageHeight/self.imageWidth
+
+            self.attrs["preserveAspectRatio"] = "none"
+            self.angle = angle
+            if pointlist:
+                self.setPointList(pointlist)
+            else:
+                self.centre = Point(centre)
+                if not width and not height:
+                    width = self.imageWidth
+                    height = self.imageHeight
+                elif not height:
+                    height = width*self.imageAspectRatio
+                elif not width:
+                    width = height/self.imageAspectRatio
+                self._width = width
+                self._height = height
+                self._setuppointlist()
+            self.style.visibility = "visible"
+            self.imageloaded = True
+            loadcomplete = window.Event.new("loadcomplete")
+            self.dispatchEvent(loadcomplete)
+
+        super().__init__()
         if objid: self.id = objid
+        self.imageloaded = False
+        self.style.visibility = "hidden"
+        if not href: return
+        self.attrs["href"] = href
+        img = html.IMG()
+        img.bind("load", initialise)
+        img.attrs["src"] = href
+
+    def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        def set_position(event=None):
+            #print("Starting set_position")
+            if centre: self.centre = Point(centre)
+            if width:
+                self._width = width
+                if preserveaspectratio and not height: self._height = width*self.currentAspectRatio
+            if height:
+                self._height = height
+                if preserveaspectratio and not width: self._width = height/self.currentAspectRatio
+            if angle is not None: self.angle = angle
+            self._setuppointlist()
+
+        if self.imageloaded:
+            set_position()
+        else:
+            self.bind("loadcomplete", set_position)
+
+    def _setuppointlist(self):
+        (cx, cy) = self.centre
+        self.pointList = [(cx-self._width/2, cy-self._height/2), (cx+self._width/2, cy+self._height/2)]
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.pointList = self._transformedpointlist(t.matrix)
+        self._update()
+        self._updatehittarget()
 
     def _update(self):
-        (x, y) = self.pointList[0]
-        self.attrs["x"] = x
-        self.attrs["y"] = y
-
-    def setPosition(self, topleft=None, centre=(0,0)):
         [(x1, y1), (x2, y2)] = self.pointList
-        (width, height) = (x2-x1, y2-y1)
-        if topleft:
-            (x, y) = topleft
-        elif centre:
-            (cx, cy) = centre
-            (x, y) = (cx-width/2, cy-height/2)
-        self.attrs["x"] = x
-        self.attrs["y"] = y
-        self.pointList = [Point((x, y)), Point((x+width, y+height))]
+        (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        self.centre = Point((cx, cy))
+        self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
+
+        t = svgbase.createSVGTransform()
+        t.setRotate(-self.angle, cx, cy)
+        basepointlist = self._transformedpointlist(t.matrix)
+        [(x1, y1), (x2, y2)] = basepointlist
+        self._width = abs(x2-x1)
+        self._height = abs(y2-y1)
+        if self._width != 0: self.currentAspectRatio = self._height/self._width
+        self.attrs["x"] = x2 if x2<x1 else x1
+        self.attrs["y"] = y2 if y2<y1 else y1
+        self.attrs["width"] = self._width
+        self.attrs["height"] = self._height
 
 class BezierObject(svg.path, ObjectMixin):
     '''Wrapper for svg path element.  Parameter:
@@ -1259,7 +1322,7 @@ class CanvasObject(svg.svg):
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         dx, dy = (x-self.startx)*self.scaleFactor, (y-self.starty)*self.scaleFactor
         self.mouseOwner.style.transform = f"translate({dx}px,{dy}px)"
-        if isinstance(self.mouseOwner, [EllipseObject, RectangleObject, UseObject]):
+        if isinstance(self.mouseOwner, [EllipseObject, RectangleObject, UseObject, ImageObject]):
             self.mouseOwner.style.transform += self.mouseOwner.rotatestring
 
     def _endDrag(self, event):
