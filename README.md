@@ -2,6 +2,13 @@
 
 To see examples of brySVG in action, try the demo [here](http://mathsanswers.org.uk/oddments/brySVG/demo.html). There are 7 demos, each in a separate tab on the page. In a tab next to each demo is the code used to generate it.
 
+## What's new in version 0.5.0
+
+- New class `UseObject`: wrapper for SVG `<use>` element.
+- New class `Definitions`: wrapper for SVG `<defs>` element (mainly for use with `UseObjects`).
+- New class `ImageObject`: wrapper for SVG `<image>` element.
+- Improved documentation - hopefully now the complete API is documented below.
+
 ## Introduction
 
 This module provides classes for simplifying the use of SVG graphics in Brython projects. It provides a `CanvasObject` and various `ShapeObjects` which are wrappers round the SVG elements and provide additional functionality.
@@ -391,6 +398,11 @@ OR: `centre`: coordinates of the centre of the object's bounding box
 `angle`: an optional angle of rotation (clockwise, in degrees).  
 Method:  
 `obj.setPosition(origin=None, centre=None, angle=None)`: Move the object by changing EITHER its `origin` OR its `centre` (if both are specified, the `origin` is used) OR neither. The `angle` of the object can also be changed.
+
+**`Definitions(objlist=[], filename=None)`**  
+Wrapper for SVG `defs` element (mainly for use with `UseObjects`). Parameters:
+    `objlist`: a list of `XxxObjects` in brySVG format.
+    `filename`: a file to be imported, containing shapes defined in standard SVG (not brySVG) format.
 
 **`ImageObject(href=None, pointlist=None, centre=(0,0), width=0, height=None, angle=0, objid=None)`**  
 Wrapper for SVG `image` element.  Parameters:  

@@ -940,9 +940,9 @@ class ImageButton(GroupObject):
         self.button.style.fill = colour
 
 class Definitions(svg.defs):
-    '''Wrapper for SVG defs element (mainly for use with UseObjects). Parameters:
-    objlist: a list of XxxObjects in brySVG format
-    filename: a file to be imported, containing shapes defined in standard SVG (not brySVG) format.'''
+    '''Wrapper for SVG `defs` element (mainly for use with `UseObjects`). Parameters:
+    `objlist`: a list of `XxxObjects` in brySVG format.
+    `filename`: a file to be imported, containing shapes defined in standard SVG (not brySVG) format.'''
     def __init__(self, objlist=[], filename=None):
         svg.defs.__init__(self)
         if filename:
