@@ -48,6 +48,7 @@ class ObjectMixin(object):
                     newobject.objectList.append(newobj)
         elif isinstance(self, ObjectMixin):
             if isinstance(self, ImageObject) and not self.imageloaded: raise RuntimeError("ImageObject cannot be cloned until fully loaded")
+            #print("Cloning a", self.__class__)
             newobject = self.__class__()
             for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "rotatestring", "centre", "_width", "_height",
                              "currentAspectRatio", "imageWidth", "imageHeight", "imageAspectRatio", "imageloaded"]:
@@ -60,6 +61,7 @@ class ObjectMixin(object):
 
         #for (key, value) in self.attrs.items():
         for key in self.attrs:
+            #print("Cloning", key)
             value = self.attrs[key]
             newobject.attrs[key] = value
         newobject.id = ""
@@ -281,7 +283,8 @@ class PolygonObject(svg.polygon, ObjectMixin):
 
     def cloneObject(self):
         newobject = self.__class__()
-        for (key, value) in self.attrs.items():
+        for key in self.attrs:
+            value = self.attrs[key]
             newobject.attrs[key] = value
         newobject.id = ""
 
