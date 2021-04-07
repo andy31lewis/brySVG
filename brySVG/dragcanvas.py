@@ -306,51 +306,109 @@ class RectangleObject(svg.rect, ObjectMixin):
     '''Wrapper for SVG rect.  Parameters:
     pointlist: a list of coordinates for two opposite vertices
     angle: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
+    def __init__(self, pointlist=None, centre=(0,0), width=0, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         svg.rect.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
-        self.pointList = [Point(coords) for coords in pointlist]
         self.angle = angle
-        self._update()
+        if pointlist:
+            self.setPointList(pointlist)
+        else:
+            self.centre = Point(centre)
+            if not height: height = width
+            if height and not width: width = height
+            self._width = width
+            self._height = height
+            self.setPosition()
         if objid: self.id = objid
+
+    def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        if centre: self.centre = Point(centre)
+        if width:
+            self._width = width
+            if preserveaspectratio and not height: self._height = width*self.currentAspectRatio
+        if height:
+            self._height = height
+            if preserveaspectratio and not width: self._width = height/self.currentAspectRatio
+        if angle is not None: self.angle = angle
+
+        (cx, cy) = self.centre
+        self.pointList = [(cx-self._width/2, cy-self._height/2), (cx+self._width/2, cy+self._height/2)]
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.pointList = self._transformedpointlist(t.matrix)
+        self._update()
+        self._updatehittarget()
 
     def _update(self):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        self.centre = Point((cx, cy))
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
 
         t = svgbase.createSVGTransform()
         t.setRotate(-self.angle, cx, cy)
         basepointlist = self._transformedpointlist(t.matrix)
         [(x1, y1), (x2, y2)] = basepointlist
+        self._width = abs(x2-x1)
+        self._height = abs(y2-y1)
+        if self._width != 0: self.currentAspectRatio = self._height/self._width
         self.attrs["x"] = x2 if x2<x1 else x1
         self.attrs["y"] = y2 if y2<y1 else y1
-        self.attrs["width"] = abs(x2-x1)
-        self.attrs["height"] = abs(y2-y1)
+        self.attrs["width"] = self._width
+        self.attrs["height"] = self._height
 
 class EllipseObject(svg.ellipse, ObjectMixin):
     '''Wrapper for SVG ellipse.  Parameters:
     pointlist: a list of coordinates for two opposite vertices of the bounding box,
     angle: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, pointlist=[(0,0), (0,0)], angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
-        svg.ellipse.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
-        self.pointList = [Point(coords) for coords in pointlist]
+    def __init__(self, pointlist=None, centre=(0,0), width=0, height=None, angle=0, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
+        svg.ellipse.__init__(self, style = {"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
         self.angle = angle
-        self._update()
+        if pointlist:
+            self.setPointList(pointlist)
+        else:
+            self.centre = Point(centre)
+            if not height: height = width
+            if height and not width: width = height
+            self._width = width
+            self._height = height
+            self.setPosition()
         if objid: self.id = objid
+
+    def setPosition(self, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        if centre: self.centre = Point(centre)
+        if width:
+            self._width = width
+            if preserveaspectratio and not height: self._height = width*self.currentAspectRatio
+        if height:
+            self._height = height
+            if preserveaspectratio and not width: self._width = height/self.currentAspectRatio
+        if angle is not None: self.angle = angle
+
+        (cx, cy) = self.centre
+        self.pointList = [(cx-self._width/2, cy-self._height/2), (cx+self._width/2, cy+self._height/2)]
+        t = svgbase.createSVGTransform()
+        t.setRotate(self.angle, cx, cy)
+        self.pointList = self._transformedpointlist(t.matrix)
+        self._update()
+        self._updatehittarget()
 
     def _update(self):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
+        self.centre = Point((cx, cy))
         self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
 
         t = svgbase.createSVGTransform()
         t.setRotate(-self.angle, cx, cy)
         basepointlist = self._transformedpointlist(t.matrix)
         [(x1, y1), (x2, y2)] = basepointlist
-        self.attrs["cx"]=(x1+x2)/2
-        self.attrs["cy"]=(y1+y2)/2
-        self.attrs["rx"]=abs(x2-x1)/2
-        self.attrs["ry"]=abs(y2-y1)/2
+        self._width = abs(x2-x1)
+        self._height = abs(y2-y1)
+        if self._width != 0: self.currentAspectRatio = self._height/self._width
+        self.attrs["cx"] = (x1+x2)/2
+        self.attrs["cy"] = (y1+y2)/2
+        self.attrs["rx"] = self._width/2
+        self.attrs["ry"] = self._height/2
 
 class CircleObject(svg.circle, ObjectMixin):
     '''Wrapper for SVG circle. Parameters:
