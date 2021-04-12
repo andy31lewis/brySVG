@@ -952,7 +952,6 @@ class Definitions(svg.defs):
 class CanvasObject(svg.svg):
     '''Wrapper for SVG svg element.  Parameters:
     width, height: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc.
-                    (to set the SVG attributes which are in pixels, call canvas.setDimensions() after creating the object.)
     colour: the background colour
     objid: the DOM id
 
@@ -1111,7 +1110,7 @@ class CanvasObject(svg.svg):
         self.viewWindow = [Point((x1, y1)), Point((x2, y2))]
         return self.viewWindow
 
-    def setDimensions(self):
+    def _getDimensions(self):
         '''If the canvas was created using non-pixel dimensions (eg percentages),
         call this after adding to the page to set the SVG `width` and `height` attributes as numbers.
         Returns a tuple `(width, height)`'''
@@ -1287,7 +1286,7 @@ class CanvasObject(svg.svg):
 
     def _getScaleFactor(self):
         '''Recalculates self.scaleFactor. This is called automatically by setViewBox or fitContents().'''
-        width, height = self.setDimensions()
+        width, height = self._getDimensions()
         if width == 0 or height == 0: return 1
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
         return max(vbwidth/width, vbheight/height)

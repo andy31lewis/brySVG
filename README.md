@@ -36,7 +36,7 @@ Then just include an `import` statement in your brython file:
 Wrapper for SVG `svg` element.  
 
 **Parameters:**  
-`width, height`: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc. (If you need the SVG attributes which are in pixels, call `canvas.setDimensions()` after creating the object.)  
+`width, height`: NB these are the CSS properties, so can be given as percentages, or vh, vw units etc.   
 `colour`: the background colour  
 `objid`: the DOM id
 
@@ -123,14 +123,11 @@ Other attributes of canvas are intended to be **read-only**:
 `canvas.tool` Only useful in `MouseMode.DRAW `or `mouseMODE.EDIT` - the current tool (see above)
 
 ### Canvas Methods  
-`canvas.setDimensions()`
-If the canvas was created using non-pixel dimensions (eg percentages), call this after creation to set the SVG width and height attributes. Returns a tuple `(width, height)`.
+`canvas.fitContents()`
+Can only be called after the canvas has been added to the page. Scales the canvas so that all the objects on it are visible. Returns (and stores in `canvas.viewWindow`) the SVG coordinates of the top-left and bottom-right of the visible canvas.
 
 `canvas.setViewBox(pointlist)`
-Should be done after the canvas has been added to the page. `pointlist` is the coordinates of the desired top-left and bottom-right of the canvas. Returns (and stores in `canvas.viewWindow`) the SVG coordinates of the actual top-left and bottom right of the canvas (which will usually be different due to the need to preserve the aspect ratio).
-
-`canvas.fitContents()`
-Scales the canvas so that all the objects on it are visible. Returns (and stores in `canvas.viewwindow`) the SVG coordinates of the top-left and bottom-right of the visible canvas.
+Can only be called after the canvas has been added to the page. `pointlist` is the coordinates of the desired top-left and bottom-right of the canvas. Returns (and stores in `canvas.viewWindow`) the SVG coordinates of the actual top-left and bottom right of the canvas (which will usually be different due to the need to preserve the aspect ratio).
 
 `canvas.getSVGcoords(event)`
 Returns the SVG coordinates if the point where a mouse or touch event occurred, as a `Point` object.
