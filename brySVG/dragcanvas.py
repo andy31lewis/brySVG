@@ -1124,6 +1124,7 @@ class CanvasObject(svg.svg):
         '''Scales the canvas so that all the objects on it are visible. Returns as `Points` (and stores in `canvas.viewwindow`)
         the coordinates of the top-left and bottom-right of the visible canvas.'''
         bbox = self.getBBox()
+        if bbox.width == 0 or bbox.height == 0: return
         wmargin, hmargin = bbox.width/50, bbox.height/50
         self.viewWindow = self.setViewBox(((bbox.x-wmargin, bbox.y-hmargin), (bbox.x+bbox.width+wmargin, bbox.y+bbox.height+hmargin)))
         #self.attrs["preserveAspectRatio"] = "none"
@@ -1176,6 +1177,8 @@ class CanvasObject(svg.svg):
             if isinstance(svgobj, GroupObject):
                 for obj in svgobj.objectList:
                     deletefromdict(obj)
+            hittarget = getattr(svgobj, "hitTarget", None)
+            if hittarget: self.deleteObject(hittarget)
             if svgobj.id in self.objectDict: del self.objectDict[svgobj.id]
 
         if not self.contains(svgobject): return
@@ -1260,6 +1263,8 @@ class CanvasObject(svg.svg):
 
     @mouseMode.setter
     def mouseMode(self, mm):
+        if mm in [MouseMode.DRAG, MouseMode.EDIT, MouseMode.TRANSFORM]:
+            self.createHitTargets()
         currentmm = getattr(self, "_mouseMode", None)
         if currentmm == mm: return
         if currentmm == MouseMode.TRANSFORM: self.hideTransformHandles()
@@ -1267,8 +1272,6 @@ class CanvasObject(svg.svg):
         self._mouseMode = mm
         if mm in [MouseMode.DRAG, MouseMode.PAN, MouseMode.TRANSFORM]:
             self.tool = "select"
-        if mm in [MouseMode.DRAG, MouseMode.EDIT, MouseMode.TRANSFORM]:
-            self.createHitTargets()
 
     @property
     def lineWidthScaling(self):
@@ -1285,6 +1288,7 @@ class CanvasObject(svg.svg):
     def _getScaleFactor(self):
         '''Recalculates self.scaleFactor. This is called automatically by setViewBox or fitContents().'''
         width, height = self.setDimensions()
+        if width == 0 or height == 0: return 1
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
         return max(vbwidth/width, vbheight/height)
 
@@ -1407,12 +1411,12 @@ class CanvasObject(svg.svg):
         if event.keyCode == 46: self.deleteSelection()
 
     def _prepareDrag(self, event):
+        self.dragStartCoords = self.getSVGcoords(event)
         self.selectedObject = self.getSelectedObject(event.target.id)
         if self.selectedObject and not self.selectedObject.fixed:
             self.mouseOwner = self.selectedObject
             self <= self.mouseOwner
             if (hittarget := getattr(self.mouseOwner, "hitTarget", None)): self <= hittarget
-            self.dragStartCoords = self.getSVGcoords(event)
             self.startx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
             self.starty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
 

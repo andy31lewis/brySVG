@@ -7,6 +7,7 @@ To see examples of brySVG in action, try the demo [here](http://mathsanswers.org
 - New class `UseObject`: wrapper for SVG `<use>` element.
 - New class `Definitions`: wrapper for SVG `<defs>` element (mainly for use with `UseObjects`).
 - New class `ImageObject`: wrapper for SVG `<image>` element.
+- New method `setPosition()`, for `RectangleObjects` and `EllipseObjects` as well as `UseObjects` and `ImageObjects`.
 - Improved documentation - hopefully now the complete API is documented below.
 
 ## Introduction
