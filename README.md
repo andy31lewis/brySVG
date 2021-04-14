@@ -157,7 +157,9 @@ Delete the currently selected object from the canvas, and from `canvas.objectDic
 `canvas.translateObject(svgobject, offset)`
 Translate an `svgobject` by `offset`.  Unlike `translateElement` (below), this will preserve the extra functionality provided by this module - ie the shape will still be able to be selected, dragged, etc.
 
-*(Note that the following three methods do not update the object's `pointList`, so that mouse interaction with the object will no longer work correctly.  If mouse interaction is needed, carry out transformations using the methods defined on the object itself (see __Shape Objects: Common methods__ below).  However, if mouse interaction is not needed, these methods are __faster__.)*
+*(Note 1: The following three methods do not update the object's `pointList`, so that mouse interaction with the object will no longer work correctly.  If mouse interaction is needed, carry out transformations using the methods defined on the object itself (see __Shape Objects: Common methods__ below).  However, if mouse interaction is not needed, these methods are __faster__.)*
+
+*(Note 2: The following three methods are also not compatible with `RectangleObjects`, `EllipseObjects`, `UseObjects` or`ImageObjects` unless they are part of a group and the method is applied to the group.)*
 
 `canvas.translateElement(element, vector)`:
 Translate `element` by `vector`.
