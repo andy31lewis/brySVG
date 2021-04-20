@@ -56,11 +56,7 @@ class TransformMixin(object):
             self.pointList = self._transformedpointlist(matrix)
             if isinstance(self, BezierObject): self.pointsetList = self._transformedpointsetlist(matrix)
             self._update()
-        hittarget = getattr(self, "hitTarget", None)
-        if hittarget:
-            hittarget.pointList = self.pointList
-            if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
-            hittarget._update()
+        self._updatehittarget()
 
     def translate(self, vector):
         '''Translate object by vector'''

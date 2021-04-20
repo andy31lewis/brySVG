@@ -84,6 +84,7 @@ class ObjectMixin(object):
         if hittarget:
             hittarget.pointList = self.pointList
             if isinstance(self, BezierObject): hittarget.pointsetList = self.pointsetList
+            if isinstance(self, (RectangleObject, EllipseObject, ImageObject, UseObject)): hittarget.angle = self.angle
             hittarget._update()
 
     def _transformedpointlist(self, matrix):
@@ -1304,7 +1305,7 @@ class CanvasObject(svg.svg):
             if hasattr(obj, "hitTarget"): continue
             if hasattr(obj, "reference"): continue # A hitTarget doesn't need its own hitTarget
             if isinstance(obj, UseObject):
-                newobj = RectangleObject(obj.pointList, obj.angle)
+                newobj = RectangleObject(pointlist=obj.pointList, angle=obj.angle)
             elif obj.style.fill != "none" or obj.fixed:
                 continue
             else:
