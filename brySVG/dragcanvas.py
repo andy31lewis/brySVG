@@ -536,8 +536,8 @@ class UseObject(svg.use, ObjectMixin):
         (xscale, yscale) = (self._width/self._origwidth, self._height/self._origheight)
         self.scalestring = f"translate({cx}px,{cy}px) scale({xscale},{yscale}) translate({-cx}px,{-cy}px)"
         self.style.transform = self.rotatestring + self.scalestring
-        origin = self.centre + self.originoffset
-        (self.attrs["x"], self.attrs["y"]) = origin
+        self.origin = self.centre + self.originoffset
+        (self.attrs["x"], self.attrs["y"]) = self.origin
 
 class ImageObject(svg.image, ObjectMixin):
     '''Wrapper for SVG `image` element.  Parameters:
