@@ -461,8 +461,12 @@ class UseObject(svg.use, ObjectMixin):
     EITHER: `origin`: coordinates on the canvas of the point (0,0) of the object being cloned
     OR: `centre`: coordinates of the centre of the object's bounding box
     (If both are specified, the `origin` is used.)
+    `width`: required width of the object (before any rotation)
+    `height` required height of the object(before any rotation)
+    (If only one of `width` and `height` is specified, the other will be set so that the object keeps its actual aspect ratio.
+    If neither is specified, the object will be displayed at its actual size.)
     `angle`: an optional angle of rotation (clockwise, in degrees).'''
-    def __init__(self, href=None, origin=None, centre=(0,0), angle=0, objid=None):
+    def __init__(self, href=None, origin=None, centre=(0,0), width=None, height=None, angle=0, scale=None, objid=None):
         svg.use.__init__(self, href=href)
         document <= svgbase
         tempgroup = svg.g() #Needed to overcome bug in iPad getBBox implementation
@@ -471,29 +475,47 @@ class UseObject(svg.use, ObjectMixin):
         bbox = tempgroup.getBBox()
         svgbase.removeChild(tempgroup)
         document.body.removeChild(svgbase)
+        self._origwidth = bbox.width
+        self._origheight = bbox.height
+        self._origaspectratio = self._origheight/self._origwidth
         (cx, cy) = (bbox.x+bbox.width/2, bbox.y+bbox.height/2)
-        self.centre = Point((cx, cy))
-        self._width = bbox.width
-        self._height = bbox.height
-        self.originoffset = -self.centre
+        self.originoffset = Point((-cx, -cy))
+
+        if width and height:
+            (self._width, self._height) = (width, height)
+        elif width:
+            (self._width, self._height) = (width, width*self._origaspectratio)
+        elif height:
+            (self._width, self._height) = (height/self._origaspectratio, height)
+        else:
+            (self._width, self._height) = (self._origwidth, self._origheight)
+        #if self._width != 0: self.currentAspectRatio = self._height/self._width
 
         if origin:
-            self.origin = Point(origin)
-            self.centre = self.origin - self.originoffset
+            scalefactors = (self._width/self._origwidth, self._height/self._origheight)
+            self.centre = Point(origin) - self.originoffset*scalefactors
         else:
             self.centre = Point(centre)
-            self.origin = self.centre + self.originoffset
         self.angle = angle
         self.setPosition()
         if objid: self.id = objid
 
-    def setPosition(self, origin=None, centre=None, angle=None):
-        '''Move the object by changing EITHER its `origin` OR its `centre`
-        (if both are specified, the `origin` is used) OR neither.
-        The `angle` of the object can also be changed.'''
+    def setPosition(self, origin=None, centre=None, width=None, height=None, angle=None, preserveaspectratio=False):
+        '''Change the position, size, and/or angle of the object.
+        If both `origin` and `centre`are specified, the `origin` is used.
+        If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`,
+        the other will be set so that the object keeps its current aspect ratio.'''
+        if width:
+            self._width = width
+            if preserveaspectratio and not height: self._height = width*self.currentAspectRatio
+        if height:
+            self._height = height
+            if preserveaspectratio and not width: self._width = height/self.currentAspectRatio
+        if self._width != 0: self.currentAspectRatio = self._height/self._width
+
         if origin:
-            self.origin = Point(origin)
-            self.centre = self.origin - self.originoffset
+            scalefactors = (self._width/self._origwidth, self._height/self._origheight)
+            self.centre = Point(origin) - self.originoffset*scalefactors
         elif centre:
             self.centre = Point(centre)
         if angle is not None: self.angle = angle
@@ -510,9 +532,12 @@ class UseObject(svg.use, ObjectMixin):
         [(x1, y1), (x2, y2)] = self.pointList
         (cx, cy) = ((x1+x2)/2, (y1+y2)/2)
         self.centre = Point((cx, cy))
-        self.rotatestring = self.style.transform = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
-        self.origin = self.centre + self.originoffset
-        (self.attrs["x"], self.attrs["y"]) = self.origin
+        self.rotatestring = f"translate({cx}px,{cy}px) rotate({self.angle}deg) translate({-cx}px,{-cy}px)"
+        (xscale, yscale) = (self._width/self._origwidth, self._height/self._origheight)
+        self.scalestring = f"translate({cx}px,{cy}px) scale({xscale},{yscale}) translate({-cx}px,{-cy}px)"
+        self.style.transform = self.rotatestring + self.scalestring
+        origin = self.centre + self.originoffset
+        (self.attrs["x"], self.attrs["y"]) = origin
 
 class ImageObject(svg.image, ObjectMixin):
     '''Wrapper for SVG `image` element.  Parameters:
@@ -1427,6 +1452,7 @@ class CanvasObject(svg.svg):
         self.mouseOwner.style.transform = f"translate({dx}px,{dy}px)"
         if isinstance(self.mouseOwner, [EllipseObject, RectangleObject, UseObject, ImageObject]):
             self.mouseOwner.style.transform += self.mouseOwner.rotatestring
+            if isinstance(self.mouseOwner, UseObject): self.mouseOwner.style.transform += self.mouseOwner.scalestring
 
     def _endDrag(self, event):
         self.mouseOwner.style.transform = "translate(0px,0px)"

@@ -389,15 +389,19 @@ Methods:
 `removeObject()`: remove an object from the group (and from the canvas if the group is on the canvas)  
 `deleteAll()`: remove all objects from the group (and from the canvas if the group is on the canvas)
 
-**`UseObject(href=None, origin=None, centre=(0,0), angle=0, objid=None)`**  
+**`UseObject(href=None, origin=None, centre=(0,0), width=None, height=None, angle=0, objid=None)`**  
 Wrapper for SVG `use` element.  Parameters:  
 `href`: the `#id` of the object being cloned  
 EITHER: `origin`: coordinates on the canvas of the point (0,0) of the object being cloned    
 OR: `centre`: coordinates of the centre of the object's bounding box  
 (If both are specified, the `origin` is used.)  
-`angle`: an optional angle of rotation (clockwise, in degrees).  
+`width`: required width of the object (before any rotation)  
+`height` required height of the object(before any rotation)  
+(If only one of `width` and `height` is specified, the other will be set so that the object keeps its actual aspect ratio.  If neither is specified, the object will be displayed at its actual size.)   
+ `angle`: an optional angle of rotation (clockwise, in degrees).   
 Method:  
-`obj.setPosition(origin=None, centre=None, angle=None)`: Move the object by changing EITHER its `origin` OR its `centre` (if both are specified, the `origin` is used) OR neither. The `angle` of the object can also be changed.
+`obj.setPosition(origin=None, centre=None, width=None, height=None, angle=None, preserveaspectratio=False)`:   
+Change the position, size, and/or angle of the object.  If both `origin` and `centre`are specified, the `origin` is used.  If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`, the other will be set so that the object keeps its current aspect ratio.
 
 **`Definitions(objlist=[], filename=None)`**  
 Wrapper for SVG `defs` element (mainly for use with `UseObjects`). Parameters:
