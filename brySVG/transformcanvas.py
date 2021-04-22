@@ -293,8 +293,9 @@ class TransformHandle(PointObject):
         self.XY = (x, y)
         if self.transformType == TransformType.TRANSLATE:
             transformstring = f"translate({dx}px,{dy}px)"
-            if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)) and self.owner.angle != 0:
+            if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)):
                 self.owner.style.transform = transformstring + self.owner.rotatestring
+                if isinstance(self.owner, UseObject): self.owner.style.transform += self.owner.scalestring
             else:
                 self.owner.style.transform = transformstring
             return
@@ -302,7 +303,6 @@ class TransformHandle(PointObject):
         (cx, cy) = self.owner.centre
         (x1, y1) = self.startx - cx, self.starty - cy
         (x2, y2) = x -cx, y - cy
-        #self.owner.style.transformOrigin = f"{cx}px {cy}px"
         if self.transformType == TransformType.ROTATE:
             (x3, y3) = (x1*x2+y1*y2, x1*y2-x2*y1)
             angle = atan2(y3, x3)*180/pi
@@ -321,8 +321,9 @@ class TransformHandle(PointObject):
         elif self.transformType == TransformType.ENLARGE:
             transformstring = f"translate({cx}px,{cy}px) scale({hypot(x2, y2)/hypot(x1, y1)}) translate({-cx}px,{-cy}px)"
 
-        if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)) and self.owner.angle != 0:
+        if isinstance(self.owner, (EllipseObject, RectangleObject, ImageObject, UseObject)):
             self.owner.style.transform = self.owner.rotatestring + transformstring
+            if isinstance(self.owner, UseObject): self.owner.style.transform += self.owner.scalestring
         else:
             self.owner.style.transform = transformstring
 
