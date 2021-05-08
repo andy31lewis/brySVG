@@ -61,7 +61,6 @@ class ObjectMixin(object):
 
         #for (key, value) in self.attrs.items():
         for key in self.attrs:
-            #print("Cloning", key)
             value = self.attrs[key]
             newobject.attrs[key] = value
         newobject.id = ""
@@ -1091,6 +1090,7 @@ class CanvasObject(svg.svg):
 
         #Attributes not intended to be used by end-users
         self.panning = False
+        self.centre = None
         self.nextid = 0
         self.objectDict = {}
         self.hittargets = []
@@ -1103,6 +1103,7 @@ class CanvasObject(svg.svg):
         self.transformBBox.style.vectorEffect = "non-scaling-stroke"
         self.rotateLine = LineObject(linecolour="blue")
         self.rotateLine.style.vectorEffect = "non-scaling-stroke"
+        self.attrs["preserveAspectRatio"] = "xMidYMid meet"
 
         self.bind("mousedown", self._onMouseDown)
         self.bind("mousemove", self._onMouseMove)
@@ -1124,7 +1125,8 @@ class CanvasObject(svg.svg):
         self.attrs["viewBox"] = f"{x1} {y1} {x2-x1} {y2-y1}"
         self.viewBoxRect = [Point((x1, y1)), Point((x2, y2))]
         self.centre = Point(((x1+x2)/2, (y1+y2)/2))
-        self.scaleFactor = self._getScaleFactor()
+        self.xScaleFactor, self.yScaleFactor = self._getScaleFactors()
+        self.scaleFactor  = max(self.xScaleFactor, self.yScaleFactor)
         bcr = self.getBoundingClientRect()
         pt = self.createSVGPoint()
         (pt.x, pt.y) = (bcr.left, bcr.top)
@@ -1152,7 +1154,6 @@ class CanvasObject(svg.svg):
         if bbox.width == 0 or bbox.height == 0: return
         wmargin, hmargin = bbox.width/50, bbox.height/50
         self.viewWindow = self.setViewBox(((bbox.x-wmargin, bbox.y-hmargin), (bbox.x+bbox.width+wmargin, bbox.y+bbox.height+hmargin)))
-        #self.attrs["preserveAspectRatio"] = "none"
         return self.viewWindow
 
     def getSVGcoords(self, event):
@@ -1308,14 +1309,16 @@ class CanvasObject(svg.svg):
         if currentlws == lws: return
         self._lineWidthScaling = lws
         for objid in self.objectDict:
-            objectDict[objid].style.vectorEffect = "none" if lws else "non-scaling-stroke"
+            self.objectDict[objid].style.vectorEffect = "none" if lws else "non-scaling-stroke"
 
-    def _getScaleFactor(self):
+    def _getScaleFactors(self):
         '''Recalculates self.scaleFactor. This is called automatically by setViewBox or fitContents().'''
         width, height = self._getDimensions()
-        if width == 0 or height == 0: return 1
+        #if width == 0 or height == 0: return 1
         vbleft, vbtop, vbwidth, vbheight = [float(x) for x in self.attrs["viewBox"].split()]
-        return max(vbwidth/width, vbheight/height)
+        xScaleFactor = vbwidth/width if width != 0 else 1
+        yScaleFactor = vbheight/height if height!= 0 else 1
+        return xScaleFactor, yScaleFactor
 
     def createHitTargets(self):
         try:
@@ -1464,6 +1467,9 @@ class CanvasObject(svg.svg):
         self.mouseOwner = None
 
     def _preparePan(self, event):
+        if not self.centre:
+            (width, height) = self._getDimensions()
+            self.setViewBox([(0,0), (width,height)])
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         self.startPoint = Point((x, y))
@@ -1474,7 +1480,8 @@ class CanvasObject(svg.svg):
     def _doPan(self, event):
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
-        delta = (Point((x, y)) - self.startPoint)*self.scaleFactor
+        sf = (self.xScaleFactor, self.yScaleFactor) if self.attrs["preserveAspectRatio"] == "none" else self.scaleFactor
+        delta = (Point((x, y)) - self.startPoint)*sf
         #self.centre = self.startCentre - delta
         newviewbox = [point-delta for point in self.panStart]
         self.setViewBox(newviewbox)
