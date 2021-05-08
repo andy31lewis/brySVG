@@ -51,7 +51,8 @@ class ObjectMixin(object):
             #print("Cloning a", self.__class__)
             newobject = self.__class__()
             for attrname in ["XY", "pointList", "pointsetList", "angle", "fixed", "rotatestring", "centre", "_width", "_height",
-                             "currentAspectRatio", "imageWidth", "imageHeight", "imageAspectRatio", "imageloaded"]:
+                             "currentAspectRatio", "imageWidth", "imageHeight", "imageAspectRatio", "imageloaded",
+                             "startangle", "endangle", "radius"]:
                 attr = getattr(self, attrname, "NO_SUCH_ATTRIBUTE")
                 if attr == "NO_SUCH_ATTRIBUTE": continue
                 newattr = list(attr) if isinstance(attr, list) else attr
@@ -453,6 +454,30 @@ class CircleObject(svg.circle, ObjectMixin):
         self.attrs["cx"]=x1
         self.attrs["cy"]=y1
         self.attrs["r"]=hypot(x2-x1, y2-y1)
+
+class SectorObject(svg.path, ObjectMixin):
+    def __init__(self, centre=(0,0), radius=0, startangle=0, endangle=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
+        self.centre = Point(centre)
+        self.radius = radius
+        self.startangle = startangle
+        self.endangle = endangle
+        if pointlist:
+            self.pointList = pointlist
+        else:
+            (cx, cy) = centre
+            point1 = Point((cx+radius*sin(startangle*pi/180), cy-radius*cos(startangle*pi/180)))
+            point2 = Point((cx+radius*sin(endangle*pi/180), cy-radius*cos(endangle*pi/180)))
+            self.pointList = [self.centre, point1, point2]
+        svg.path.__init__(self, style={"stroke":linecolour, "stroke-width":linewidth, "fill":fillcolour})
+        self._update()
+        if objid: self.id = objid
+
+    def _update(self):
+        while len(self.pointList) < 3: self.pointList.append(self.pointList[-1])
+        [(x1, y1), (x2, y2), (x3, y3)] = self.pointList
+        r = self.radius
+        largeArcFlag = 1 if (self.endangle - self.startangle) % 360 > 180 else 0
+        self.attrs["d"] = f"M {x1} {y1} L {x2} {y2} A {r} {r} 0 {largeArcFlag} 1 {x3} {y3} Z"
 
 class UseObject(svg.use, ObjectMixin):
     '''Wrapper for SVG `use` element.  Parameters:
