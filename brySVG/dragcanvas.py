@@ -1138,6 +1138,8 @@ class CanvasObject(svg.svg):
         self.bind("touchend", self._onLeftUp)
         self.bind("dragstart", self._onDragStart)
         self.bind("dblclick", self._onDoubleClick)
+        self.bind("contextmenu", self._onRightClick)
+        self.bind("wheel", self._onWheel)
         document.bind("keydown", self._onKeyDown)
 
     # Methods available to end-users
@@ -1372,35 +1374,43 @@ class CanvasObject(svg.svg):
             self.hittargets.append(newobj)
             self.addObject(newobj)
 
+    def _onWheel(self, event):
+        if self.mouseMode == MouseMode.PAN:
+            event.preventDefault()
+            zoomfactor = 0.9 if event.deltaY < 0 else 1.1
+            newviewbox = [self.centre + zoomfactor*(point - self.centre) for point in self.viewBoxRect]
+            self.setViewBox(newviewbox)
+
     def _onRightClick(self, event):
-        event.preventDefault()
+        #event.preventDefault()
+        pass
 
     def _onDragStart(self, event):
         event.preventDefault()
 
     def _onTouchStart(self, event):
         event.preventDefault()
-        #global lasttaptime
-        #latesttaptime = time.time()
-        #if latesttaptime - lasttaptime < 0.3:
-        #    for function in self.events("dblclick"):
-        #        function(event)
-        #else:
-        self._onLeftDown(event)
-        #lasttaptime = latesttaptime
+        global lasttaptime
+        latesttaptime = time.time()
+        if event.touches.length == 1 and latesttaptime - lasttaptime < 0.3:
+            for function in self.events("dblclick"):
+                function(event)
+        else:
+            self._onLeftDown(event)
+        lasttaptime = latesttaptime
 
     def _onMouseDown(self, event):
+        event.preventDefault()
         if not self.mouseDetected:
             self.mouseDetected = True
             for obj in self.objectDict.values():
                 if hasattr(obj, "reference"):
                     if isinstance(obj.reference, UseObject): continue
                     obj.style.strokeWidth = 10*self.scaleFactor
-        if event.button > 0: return
+        if self.mouseMode != MouseMode.PAN and event.button > 0: return
         self._onLeftDown(event)
 
     def _onLeftDown(self, event):
-        #event.preventDefault()
         if self.mouseMode == MouseMode.DRAG:
             self._prepareDrag(event)
         elif self.mouseMode == MouseMode.TRANSFORM:
@@ -1458,7 +1468,10 @@ class CanvasObject(svg.svg):
             obj.reference.dispatchEvent(newevent)
 
     def _onDoubleClick(self, event):
-        if self.mouseMode == MouseMode.DRAW: self.setTool("select")
+        if self.mouseMode == MouseMode.DRAW:
+            self.setTool("select")
+        elif self.mouseMode == MouseMode.PAN:
+            self.fitContents()
 
     def _onKeyDown(self, event):
         if event.keyCode == 46: self.deleteSelection()
@@ -1495,6 +1508,11 @@ class CanvasObject(svg.svg):
         if not self.centre:
             (width, height) = self._getDimensions()
             self.setViewBox([(0,0), (width,height)])
+        if "touch" in event.type and event.touches.length == 2:
+            point0 = Point((event.touches[0].clientX, event.touches[0].clientY))
+            point1 = Point((event.touches[1].clientX, event.touches[1].clientY))
+            self.startZoomLength = (point1-point0).length()
+            #print(point0, point1, self.startZoomLength)
         x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
         self.startPoint = Point((x, y))
@@ -1503,17 +1521,26 @@ class CanvasObject(svg.svg):
         self.panning = True
 
     def _doPan(self, event):
-        x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
-        y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
-        sf = (self.xScaleFactor, self.yScaleFactor) if self.attrs["preserveAspectRatio"] == "none" else self.scaleFactor
-        delta = (Point((x, y)) - self.startPoint)*sf
-        #self.centre = self.startCentre - delta
-        newviewbox = [point-delta for point in self.panStart]
-        self.setViewBox(newviewbox)
+        if "touch" in event.type and event.touches.length == 2:
+            point0 = Point((event.touches[0].clientX, event.touches[0].clientY))
+            point1 = Point((event.touches[1].clientX, event.touches[1].clientY))
+            newzoomlength = (point1-point0).length()
+            zoomfactor = self.startZoomLength/newzoomlength
+            #print(zoomfactor)
+            newviewbox = [self.centre + zoomfactor*(point - self.centre) for point in self.viewBoxRect]
+            self.setViewBox(newviewbox)
+            self.startZoomLength = newzoomlength
+        else:
+            x = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
+            y = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
+            sf = (self.xScaleFactor, self.yScaleFactor) if self.attrs["preserveAspectRatio"] == "none" else self.scaleFactor
+            delta = (Point((x, y)) - self.startPoint)*sf
+            #self.centre = self.startCentre - delta
+            newviewbox = [point-delta for point in self.panStart]
+            self.setViewBox(newviewbox)
 
     def _endPan(self, event):
         self.panning = False
-        #print(f"pan: new centre {self.centre}, new viewbox {self.viewBoxRect}")
 
     def getSelectedObject(self, objectid, getGroup = True):
         '''Returns the object on the canvas identified by `id`.
