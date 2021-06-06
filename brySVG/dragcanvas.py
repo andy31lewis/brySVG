@@ -1407,7 +1407,7 @@ class CanvasObject(svg.svg):
                 if hasattr(obj, "reference"):
                     if isinstance(obj.reference, UseObject): continue
                     obj.style.strokeWidth = 10*self.scaleFactor
-        if self.mouseMode != MouseMode.PAN and event.button > 0: return
+        if event.button > 0: return
         self._onLeftDown(event)
 
     def _onLeftDown(self, event):

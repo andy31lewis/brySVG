@@ -354,7 +354,7 @@ class Handle(PointObject):
         self.style.strokeWidth = strokewidth
         self.style.fillOpacity = opacity
         self.owner = owner
-        self.index = index
+        self.pointIndex = index
         self.canvas = canvas
         self.bind("mousedown", self._select)
         self.bind("touchstart", self._select)
@@ -364,7 +364,7 @@ class Handle(PointObject):
         event.preventDefault()
         event.stopPropagation()
         if self.canvas.tool == "deletepoint":
-            self.canvas._deletePoint(self.index)
+            self.canvas._deletePoint(self.pointIndex)
             return
         self.canvas.startx = self.canvas.currentx = event.targetTouches[0].clientX if "touch" in event.type else event.clientX
         self.canvas.starty = self.canvas.currenty = event.targetTouches[0].clientY if "touch" in event.type else event.clientY
@@ -382,9 +382,9 @@ class Handle(PointObject):
             for ch in self.controlHandles:
                 ch.XY += offset
                 pointset[ch.subindex] = ch.XY
-            self.owner.setPointset(self.index, pointset)
+            self.owner.setPointset(self.pointIndex, pointset)
         else:
-            self.owner.setPoint(self.index, self.XY)
+            self.owner.setPoint(self.pointIndex, self.XY)
 
 class ControlHandle(PointObject):
     def __init__(self, owner, index, subindex, coords, colour, canvas):
@@ -396,7 +396,7 @@ class ControlHandle(PointObject):
         self.style.strokeWidth = strokewidth
         self.style.visibility = "hidden"
         self.owner = owner
-        self.index = index
+        self.pointIndex = index
         self.subindex = subindex
         self.canvas = canvas
         self.bind("mousedown", self._select)
@@ -410,7 +410,7 @@ class ControlHandle(PointObject):
 
     def _movePoint(self, offset):
         self.XY += offset
-        pointset = self.owner.pointsetList[self.index]
+        pointset = self.owner.pointsetList[self.pointIndex]
         pointset[self.subindex] = self.XY
         if self.linkedHandle:
             point = pointset[1]
@@ -420,7 +420,7 @@ class ControlHandle(PointObject):
             newothercoords = point-newoffset
             pointset[self.linkedHandle.subindex] = newothercoords
             self.linkedHandle.XY = newothercoords
-        self.owner.setPointset(self.index, pointset)
+        self.owner.setPointset(self.pointIndex, pointset)
 
 nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, ImageObject]
 for cls in nonbezier:
