@@ -55,7 +55,7 @@ After creation, there are various attributes which control how the canvas respon
 No user interaction with the canvas. (This is the default.)
 
 #### `canvas.mouseMode = MouseMode.PAN`  
-Dragging the canvas pans the viewport.
+Dragging the canvas pans the viewport. To zoom the viewport, either use the mouse wheel (or equivalent on a touchpad), or pinch with two fingers on a touchscreen.
 
 #### `canvas.mouseMode = MouseMode.DRAG`
 Objects can be dragged around on the canvas.
@@ -307,12 +307,18 @@ Method:
 `obj.setPosition(centre=None, width=None, height=None, angle=None, preserveaspectratio=False)`:  
 Change the position, size, and/or angle of the ellipse.  If only one of `width` and `height` is specified, and `preserveaspectratio` is set to `True`, the other will be set so that the ellipse keeps its current aspect ratio.
 
-### CircleObject, LineObject
+### CircleObject, SectorObject, LineObject
 
-**`CircleObject(self, centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None)`**  
+**`CircleObject(centre=(0,0), radius=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None)`**  
 Parameters:  
 **Either** `centre` and `radius` of the circle.  
 **or** `pointlist`: a list of two points - the centre of the circle and any point on the circumference.  
+(If both are given, the `pointlist` takes priority.)
+
+**`SectorObject(centre=(0,0), radius=0, startangle=0, endangle=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None)`**  
+Parameters:  
+**Either** `centre` and `radius` of the circle, and two angles (measured clockwise from the top of the circle) showing the start and finish of the sector.  
+**or** `pointlist`: a list of three points - the centre of the circle and two points on the circumference. (Note that if the two points are not the same distance from the centre, the shape will not be a true sector of a circle.)
 (If both are given, the `pointlist` takes priority.)
 
 **`LineObject(pointlist=[(0,0), (0,0)], style="solid", linecolour="black", linewidth=1, fillcolour="none", objid=None)`**   

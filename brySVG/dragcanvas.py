@@ -456,6 +456,11 @@ class CircleObject(svg.circle, ObjectMixin):
         self.attrs["r"]=hypot(x2-x1, y2-y1)
 
 class SectorObject(svg.path, ObjectMixin):
+    ''' A sector of a circle. Parameters:
+    **Either** `centre` and `radius` of the circle, and two angles (measured clockwise from the top of the circle)
+     showing the start and finish of the sector.
+    **or** `pointlist`: a list of three points - the centre of the circle and two points on the circumference
+    (Note that if the two points are not the same distance from the centre, the shape will not be a true sector of a circle.)'''
     def __init__(self, centre=(0,0), radius=0, startangle=0, endangle=0, pointlist=None, linecolour="black", linewidth=1, fillcolour="yellow", objid=None):
         self.centre = Point(centre)
         self.radius = radius
