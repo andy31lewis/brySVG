@@ -1,6 +1,6 @@
 # brySVG
 
-To see examples of brySVG in action, try the demo [here](http://mathsanswers.org.uk/oddments/brySVG/demo.html). There are 7 demos, each in a separate tab on the page. In a tab next to each demo is the code used to generate it.
+To see examples of brySVG in action, try the demo [here](https://andy31lewis.github.io/brySVG/demo.html). There are 7 demos, each in a separate tab on the page. In a tab next to each demo is the code used to generate it.
 
 ## What's new in version 0.5.0
 
