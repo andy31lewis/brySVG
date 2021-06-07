@@ -473,11 +473,11 @@ class SectorObject(svg.path, ObjectMixin):
         if objid: self.id = objid
 
     def _update(self):
-        while len(self.pointList) < 3: self.pointList.append(self.pointList[-1])
-        [(x1, y1), (x2, y2), (x3, y3)] = self.pointList
-        r = self.radius
+        [(x0, y0), (x1, y1)] = self.pointList[:2]
+        (x2, y2) = self.pointList[-1]
+        r = hypot(x1-x0, y1-y0)
         largeArcFlag = 1 if (self.endangle - self.startangle) % 360 > 180 else 0
-        self.attrs["d"] = f"M {x1} {y1} L {x2} {y2} A {r} {r} 0 {largeArcFlag} 1 {x3} {y3} Z"
+        self.attrs["d"] = f"M {x0} {y0} L {x1} {y1} A {r} {r} 0 {largeArcFlag} 1 {x2} {y2} Z"
 
 class UseObject(svg.use, ObjectMixin):
     '''Wrapper for SVG `use` element.  Parameters:
@@ -1648,6 +1648,9 @@ class Point(object):
     def __sub__(self, other):
         return Point([xi-yi for (xi, yi) in zip(self.coords, other.coords)])
 
+    def __rsub__(self, other):
+        return Point([xi-yi for (xi, yi) in zip(other.coords, self.coords)])
+
     def __neg__(self):
         return Point([-xi for xi in self.coords])
 
@@ -1731,5 +1734,5 @@ def roundsf(x, sf=3):
     return round(x, sf-int(floor(log10(abs(x))))-1)
 
 shapetypes = {"line":LineObject, "polygon":PolygonObject, "polyline":PolylineObject,
-"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject,
+"rectangle":RectangleObject, "ellipse":EllipseObject, "circle":CircleObject, "sector":SectorObject,
 "bezier":BezierObject, "closedbezier":ClosedBezierObject, "smoothbezier":SmoothBezierObject, "smoothclosedbezier":SmoothClosedBezierObject}

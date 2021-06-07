@@ -179,6 +179,7 @@ class DrawCanvasMixin(object):
             while len(svgobj.pointList) > 1 and svgobj.pointList[-1] == svgobj.pointList[-2]:
                 svgobj.deletePoints(-1, None)
             if len(svgobj.pointList) == 1: self.deleteObject(svgobj)
+            if isinstance(svgobj, SectorObject): svgobj.pointList = svgobj.pointList[:2] + svgobj.pointList[-1:]
         elif isinstance(svgobj, NonBezierMixin):
             if svgobj.pointList[0] == svgobj.pointList[1]: self.deleteObject(svgobj)
         self.mouseOwner = None
@@ -422,11 +423,11 @@ class ControlHandle(PointObject):
             self.linkedHandle.XY = newothercoords
         self.owner.setPointset(self.pointIndex, pointset)
 
-nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, ImageObject]
+nonbezier = [LineObject, RectangleObject, EllipseObject, CircleObject, SectorObject, PolylineObject, PolygonObject, ImageObject]
 for cls in nonbezier:
     cls.__bases__ = cls.__bases__ + (NonBezierMixin,)
     #print(cls, cls.__bases__)
-polyshape = [PolylineObject, PolygonObject]
+polyshape = [PolylineObject, PolygonObject, SectorObject]
 for cls in polyshape:
     cls.__bases__ = cls.__bases__ + (PolyshapeMixin,)
     #print(cls, cls.__bases__)

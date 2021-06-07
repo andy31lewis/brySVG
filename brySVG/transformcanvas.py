@@ -327,7 +327,7 @@ class TransformHandle(PointObject):
         else:
             self.owner.style.transform = transformstring
 
-classes = [LineObject, RectangleObject, EllipseObject, CircleObject, PolylineObject, PolygonObject, BezierObject,
+classes = [LineObject, RectangleObject, EllipseObject, CircleObject, SectorObject, PolylineObject, PolygonObject, BezierObject,
 ClosedBezierObject, SmoothBezierObject, SmoothClosedBezierObject, PointObject, RegularPolygon, GroupObject, ImageObject, UseObject]
 for cls in classes:
     cls.__bases__ = cls.__bases__ + (TransformMixin,)
