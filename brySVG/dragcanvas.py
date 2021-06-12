@@ -166,7 +166,7 @@ class TextObject(svg.text, ObjectMixin):
     1  2  3  ie if anchorposition is 1, the anchorpoint is top-left, if it is 5 it is in the centre of the box, etc
     4  5  6
     7  8  9'''
-    def __init__(self, string="", anchorpoint=(0,0), anchorposition=1, fontsize=12, style="normal", ignorescaling=False, canvas=None, objid=None):
+    def __init__(self, string="", anchorpoint=(0,0), anchorposition=1, fontsize=12, textcolour="black", outlinecolour="none", style="normal", ignorescaling=False, canvas=None, objid=None):
         (x, y) = anchorpoint
         stringlist = string.split("\n")
         rowcount = len(stringlist)
@@ -187,7 +187,7 @@ class TextObject(svg.text, ObjectMixin):
         else:
             yoffset = fontsize - lineheight*rowcount
 
-        svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos)
+        svg.text.__init__(self, stringlist[0], x=x, y=y+yoffset, font_size=fontsize, text_anchor=horizpos, style={"stroke":outlinecolour, "fill":textcolour})
         for s in stringlist[1:]:
             self <= svg.tspan(s, x=x, dy=lineheight)
         if objid: self.id = objid
@@ -195,14 +195,14 @@ class TextObject(svg.text, ObjectMixin):
 class WrappingTextObject(svg.text):
     '''See TextObject above for explanation of most of the parameters; however, note that canvas must be specified.
     A width in SVG units is also specified, and text will be wrapped at word boundaries to fit that width.'''
-    def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, style="normal", ignorescaling=False, objid=None):
+    def __init__(self, canvas, string, anchorpoint, width, anchorposition=1, fontsize=12, textcolour="black", outlinecolour="none", style="normal", ignorescaling=False, objid=None):
         (x, y) = anchorpoint
         lineheight = fontsize*1.2
         if ignorescaling:
             fontsize *= canvas.scaleFactor
             lineheight *= canvas.scaleFactor
         words = string.split()
-        svg.text.__init__(self, "", x=x, font_size=fontsize)
+        svg.text.__init__(self, "", x=x, font_size=fontsize, style={"stroke":outlinecolour, "fill":textcolour})
         canvas <= self
         tspan = svg.tspan(words.pop(0), x=x, dy=0)
         self <= tspan
